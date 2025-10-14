@@ -1,14 +1,15 @@
 package workers
 
 import (
-	"pkg.jsn.cam/toyreduce/pkg/executor"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
+	"pkg.jsn.cam/toyreduce/workers/actioncount"
 )
 
 import "pkg.jsn.cam/toyreduce/workers/wordcount"
 
 var Executors = map[string]toyreduce.Worker{
-	"wordcount": wordcount.WordCountWorker{},
+	"wordcount":   wordcount.WordCountWorker{},
+	"actioncount": actioncount.ActionCountWorker{},
 }
 
 func IsValidExecutor(name string) bool {
@@ -31,5 +32,5 @@ func GetDescription(name string) (string, error) {
 	if worker, exists := Executors[name]; exists {
 		return worker.Description(), nil
 	}
-	return "", executor.InvalidExecutorError
+	return "", toyreduce.InvalidExecutorError
 }

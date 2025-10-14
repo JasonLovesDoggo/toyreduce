@@ -1,4 +1,4 @@
-package executor
+package toyreduce
 
 import (
 	"bufio"
@@ -53,13 +53,33 @@ func Chunk(filePath string, chunkSize int, out chan<- []string) error {
 	return scanner.Err()
 }
 
-func Map(chunks <-chan []string, mapFunc func([]string) ([][2]string, error), out chan<- [][2]string) error {
+func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
+	var all []KeyValue
 	for chunk := range chunks {
-		mappedData, err := mapFunc(chunk)
+		err := worker.Map(chunk, func(kv KeyValue) {
+			all = append(all, kv)
+		})
 		if err != nil {
-			return err
+			return nil, err
 		}
-		out <- mappedData
 	}
-	return nil
+	return all, nil
+}
+
+func Shuffle(pairs []KeyValue) map[string][]string {
+	grouped := make(map[string][]string)
+	for _, kv := range pairs {
+		grouped[kv.Key] = append(grouped[kv.Key], kv.Value)
+	}
+	return grouped
+}
+
+func ReducePhase(groups map[string][]string, worker Worker) []KeyValue {
+	var results []KeyValue
+	for key, values := range groups {
+		worker.Reduce(key, values, func(kv KeyValue) {
+			results = append(results, kv)
+		})
+	}
+	return results
 }

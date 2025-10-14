@@ -52,3 +52,14 @@ func Chunk(filePath string, chunkSize int, out chan<- []string) error {
 	close(out)
 	return scanner.Err()
 }
+
+func Map(chunks <-chan []string, mapFunc func([]string) ([][2]string, error), out chan<- [][2]string) error {
+	for chunk := range chunks {
+		mappedData, err := mapFunc(chunk)
+		if err != nil {
+			return err
+		}
+		out <- mappedData
+	}
+	return nil
+}

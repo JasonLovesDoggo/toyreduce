@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@tanstack/svelte-table':
+        specifier: npm:tanstack-table-8-svelte-5@^0.1.2
+        version: tanstack-table-8-svelte-5@0.1.2(svelte@5.39.12)
       svelte-simple-modal:
         specifier: ^2.0.0
         version: 2.0.0(svelte@5.39.12)
@@ -585,6 +588,10 @@ packages:
     resolution: {integrity: sha512-BoFUoU0XqgCUS1UXWhmDJroKKhNXeDzD7/XwabjkDIAbMnc4ULn5e2FuEuBbhZ6ENZoSYzKlzvZ44Yr6EUDUSA==}
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7
+
+  '@tanstack/table-core@8.21.3':
+    resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
+    engines: {node: '>=12'}
 
   '@types/cookie@0.6.0':
     resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
@@ -1347,6 +1354,11 @@ packages:
   tailwindcss@4.1.14:
     resolution: {integrity: sha512-b7pCxjGO98LnxVkKjaZSDeNuljC4ueKUddjENJOADtubtdo8llTaJy7HwBMeLNSSo2N5QIAgklslK1+Ir8r6CA==}
 
+  tanstack-table-8-svelte-5@0.1.2:
+    resolution: {integrity: sha512-wMRu7Y709GpRrbPSN6uiYPCsNk5J/ZjvNuHGCbSUNNZEs1u4q09qnoTbY1EcwGAb3RkDEHEyrE9ArJNT4w0HOg==}
+    peerDependencies:
+      svelte: ^5.0.0
+
   tapable@2.3.0:
     resolution: {integrity: sha512-g9ljZiwki/LfxmQADO3dEY1CbpmXT5Hm2fJ+QaGKwSXUylMybePR7/67YW7jOrrvjEgL1Fmz5kzyAjWVWLlucg==}
     engines: {node: '>=6'}
@@ -1846,6 +1858,8 @@ snapshots:
       '@tailwindcss/oxide': 4.1.14
       tailwindcss: 4.1.14
       vite: 7.1.9(@types/node@20.19.21)(jiti@2.6.1)(lightningcss@1.30.1)
+
+  '@tanstack/table-core@8.21.3': {}
 
   '@types/cookie@0.6.0': {}
 
@@ -2563,6 +2577,11 @@ snapshots:
       zimmerframe: 1.1.4
 
   tailwindcss@4.1.14: {}
+
+  tanstack-table-8-svelte-5@0.1.2(svelte@5.39.12):
+    dependencies:
+      '@tanstack/table-core': 8.21.3
+      svelte: 5.39.12
 
   tapable@2.3.0: {}
 

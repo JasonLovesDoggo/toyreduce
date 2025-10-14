@@ -39,6 +39,7 @@
 		"vite": "^7.1.7"
 	},
 	"dependencies": {
+		"@tanstack/svelte-table": "npm:tanstack-table-8-svelte-5@^0.1.2",
 		"svelte-simple-modal": "^2.0.0"
 	}
 }

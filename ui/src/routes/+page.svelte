@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import WorkerStatus from '$lib/components/WorkerStatus.svelte';
 	import JobList from '$lib/components/JobList.svelte';
 	import JobSubmitForm from '$lib/components/JobSubmitForm.svelte';
 	import CacheVisualization from '$lib/components/CacheVisualization.svelte';
+	import ResultsViewer from '$lib/components/ResultsViewer.svelte';
 
 	const API_BASE = 'http://localhost:8080';
 
@@ -16,11 +17,11 @@
 	let error = $state('');
 
 	// Get active tab from URL query parameter
-	let activeTab = $derived<'jobs' | 'cache' | 'workers'>(
-		($page.url.searchParams.get('tab') as 'jobs' | 'cache' | 'workers') || 'jobs'
+	let activeTab = $derived<'jobs' | 'results' | 'cache' | 'workers'>(
+		(page.url.searchParams.get('tab') as 'jobs' | 'results' | 'cache' | 'workers') || 'jobs'
 	);
 
-	function setTab(tab: 'jobs' | 'cache' | 'workers') {
+	function setTab(tab: 'jobs' | 'results' | 'cache' | 'workers') {
 		goto(`?tab=${tab}`, { replaceState: false, keepFocus: true });
 	}
 
@@ -69,8 +70,7 @@
 		}
 	}
 
-	async function handleJobSubmit(event: CustomEvent) {
-		const jobData = event.detail;
+	async function handleJobSubmit(jobData: any) {
 		try {
 			const res = await fetch(`${API_BASE}/api/jobs`, {
 				method: 'POST',
@@ -89,8 +89,7 @@
 		}
 	}
 
-	async function handleJobCancel(event: CustomEvent) {
-		const jobId = event.detail;
+	async function handleJobCancel(jobId: string) {
 		if (!confirm('Are you sure you want to cancel this job?')) return;
 
 		try {
@@ -128,6 +127,14 @@
 					: 'text-[var(--text-muted)]'}"
 			>
 				Jobs
+			</button>
+			<button
+				onclick={() => setTab('results')}
+				class="tab pb-3 text-sm tracking-wider uppercase {activeTab === 'results'
+					? 'active text-[var(--fg)]'
+					: 'text-[var(--text-muted)]'}"
+			>
+				Results
 			</button>
 			<button
 				onclick={() => setTab('cache')}
@@ -168,9 +175,11 @@
 		{#if activeTab === 'jobs'}
 			<div class="space-y-8">
 				<WorkerStatus {workers} />
-				<JobSubmitForm on:submit={handleJobSubmit} />
-				<JobList {jobs} on:cancel={handleJobCancel} on:refresh={fetchData} {API_BASE} />
+				<JobSubmitForm onSubmit={handleJobSubmit} />
+				<JobList {jobs} onCancel={handleJobCancel} onRefresh={fetchData} {API_BASE} />
 			</div>
+		{:else if activeTab === 'results'}
+			<ResultsViewer {API_BASE} />
 		{:else if activeTab === 'cache'}
 			<CacheVisualization {API_BASE} />
 		{:else if activeTab === 'workers'}

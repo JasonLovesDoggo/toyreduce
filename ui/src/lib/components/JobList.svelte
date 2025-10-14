@@ -1,0 +1,133 @@
+<script lang="ts">
+	import { createEventDispatcher, getContext } from 'svelte';
+	import JobDetails from './JobDetails.svelte';
+
+	const dispatch = createEventDispatcher();
+	const { open } = getContext('simple-modal');
+
+	let { jobs = [], API_BASE = '' } = $props<{ jobs: any[]; API_BASE: string }>();
+
+	function getStatusColor(status: string) {
+		switch (status) {
+			case 'queued':
+				return 'border-[var(--border)] text-[var(--text-muted)]';
+			case 'running':
+				return 'border-[var(--accent)] text-[var(--accent)]';
+			case 'completed':
+				return 'border-[var(--fg)] text-[var(--fg)]';
+			case 'failed':
+				return 'border-red-500 text-red-600';
+			case 'cancelled':
+				return 'border-[var(--text-muted)] text-[var(--text-muted)]';
+			default:
+				return 'border-[var(--border)] text-[var(--text-muted)]';
+		}
+	}
+
+	function formatDate(date: string) {
+		return new Date(date).toLocaleString();
+	}
+
+	function formatDuration(seconds: number): string {
+		if (!seconds || seconds === 0) return '—';
+
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		const secs = Math.floor(seconds % 60);
+
+		if (hours > 0) {
+			return `${hours}h ${minutes}m ${secs}s`;
+		} else if (minutes > 0) {
+			return `${minutes}m ${secs}s`;
+		} else {
+			return `${secs}s`;
+		}
+	}
+
+	function formatTaskThroughput(tasks: number, seconds: number): string {
+		if (!seconds || seconds === 0 || !tasks) return '—';
+		const throughput = tasks / seconds;
+		return throughput < 1 ? throughput.toFixed(2) : throughput.toFixed(1);
+	}
+
+	function showDetails(job: any) {
+		open(JobDetails, {
+			job,
+			API_BASE,
+			onCancel: () => {
+				dispatch('cancel', job.id);
+			}
+		});
+	}
+
+	function getProgressPercent(job: any) {
+		if (!job.total_tasks || job.total_tasks === 0) return 0;
+		return Math.round((job.completed_tasks / job.total_tasks) * 100);
+	}
+</script>
+
+<div class="border border-[var(--border)] bg-[var(--surface)] p-8">
+	<h2 class="mb-6 text-lg font-semibold text-[var(--fg)]">Jobs</h2>
+
+	{#if jobs.length === 0}
+		<p class="py-8 text-center text-sm text-[var(--text-muted)]">
+			No jobs yet. Submit your first job above!
+		</p>
+	{:else}
+		<div class="space-y-3">
+			{#each jobs as job (job.id)}
+				<div
+					role="button"
+					tabindex="0"
+					class="cursor-pointer border border-[var(--border)] bg-[var(--surface)] p-4 transition-colors hover:border-[var(--accent)]"
+					onclick={() => showDetails(job)}
+					onkeydown={(e) => e.key === 'Enter' && showDetails(job)}
+				>
+					<div class="flex items-start justify-between">
+						<div class="flex-1">
+							<div class="mb-2 flex items-center gap-3">
+								<span class="font-mono text-xs text-[var(--text-muted)]">
+									{job.id.slice(0, 8)}
+								</span>
+								<span
+									class={`border px-2 py-0.5 text-xs tracking-wider uppercase ${getStatusColor(job.status)}`}
+								>
+									{job.status}
+								</span>
+								<span class="text-xs text-[var(--text-muted)]">{job.executor}</span>
+							</div>
+
+							<div class="font-mono text-sm text-[var(--fg)]">
+								{job.input_path}
+							</div>
+
+							{#if job.status === 'running'}
+								<div class="mt-3">
+									<div
+										class="mb-2 flex items-center gap-2 text-xs text-[var(--text-muted)] tabular-nums"
+									>
+										<span>Progress: {getProgressPercent(job)}%</span>
+										<span>•</span>
+										<span>Map: {job.map_tasks_done}/{job.map_tasks_total}</span>
+										<span>•</span>
+										<span>Reduce: {job.reduce_tasks_done}/{job.reduce_tasks_total}</span>
+									</div>
+									<div class="h-1 w-full bg-[var(--border)]">
+										<div
+											class="h-1 bg-[var(--accent)] transition-all"
+											style="width: {getProgressPercent(job)}%"
+										></div>
+									</div>
+								</div>
+							{/if}
+						</div>
+
+						<div class="text-right text-xs text-[var(--text-muted)]">
+							{formatDate(job.submitted_at)}
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+	{/if}
+</div>

@@ -57,27 +57,36 @@ func (m *Master) checkWorkerHealth(timeout time.Duration) {
 
 // requeueTask resets a task back to idle status (called with lock held)
 func (m *Master) requeueTask(taskID string) {
+	// No current job
+	if m.currentJobID == "" {
+		return
+	}
+
+	state := m.jobStates[m.currentJobID]
+
 	// Try to find in map tasks
-	for _, task := range m.mapTasks {
+	for _, task := range state.mapTasks {
 		if task.ID == taskID {
 			if task.Status == protocol.TaskStatusInProgress {
 				task.Status = protocol.TaskStatusIdle
 				task.WorkerID = ""
 				task.RetryCount++
-				log.Printf("[MASTER] Requeued map task %s (retry %d)", taskID, task.RetryCount)
+				log.Printf("[MASTER] Job %s: Requeued map task %s (retry %d)",
+					m.currentJobID, taskID, task.RetryCount)
 			}
 			return
 		}
 	}
 
 	// Try to find in reduce tasks
-	for _, task := range m.reduceTasks {
+	for _, task := range state.reduceTasks {
 		if task.ID == taskID {
 			if task.Status == protocol.TaskStatusInProgress {
 				task.Status = protocol.TaskStatusIdle
 				task.WorkerID = ""
 				task.RetryCount++
-				log.Printf("[MASTER] Requeued reduce task %s (retry %d)", taskID, task.RetryCount)
+				log.Printf("[MASTER] Job %s: Requeued reduce task %s (retry %d)",
+					m.currentJobID, taskID, task.RetryCount)
 			}
 			return
 		}

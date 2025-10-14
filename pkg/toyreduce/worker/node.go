@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -39,24 +40,20 @@ func NewNode(cfg Config) *Node {
 
 // Start starts the worker main loop
 func (n *Node) Start() error {
-	log.Printf("[WORKER:%s] Starting worker", n.id)
+	log.Printf("[WORKER:%s] Starting worker (version: %s)", n.id, protocol.ToyReduceVersion)
+
+	// Collect available executors
+	executors := workers.ListExecutors()
+	log.Printf("[WORKER:%s] Available executors: %v", n.id, executors)
 
 	// Register with master
-	regResp, err := n.client.Register(n.id)
+	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executors)
 	if err != nil {
-		return err
+		log.Printf("[WORKER:%s] Registration failed: %v", n.id, err)
+		return fmt.Errorf("registration failed: %w", err)
 	}
 
-	log.Printf("[WORKER:%s] Registered with master (cache: %s, executor: %s)",
-		n.id, regResp.CacheURL, regResp.ExecutorName)
-
-	// Get the worker implementation
-	worker := getWorkerByName(regResp.ExecutorName)
-	if worker == nil {
-		log.Fatalf("[WORKER:%s] Unknown executor: %s", n.id, regResp.ExecutorName)
-	}
-
-	n.processor = NewProcessor(worker, n.client)
+	log.Printf("[WORKER:%s] Registration successful (cache: %s)", n.id, regResp.CacheURL)
 
 	// Start heartbeat goroutine
 	go n.heartbeatLoop()
@@ -90,6 +87,21 @@ func (n *Node) taskLoop() {
 			time.Sleep(pollInterval)
 
 		case protocol.TaskTypeMap:
+			// Get worker implementation for this task's executor
+			// The executor info is now embedded in the task (from current job)
+			// For now, we'll instantiate processor per task when we have multi-job support
+			// Currently using the old single-job approach
+			if n.processor == nil {
+				// Lazy initialization (for backwards compat during refactor)
+				worker := getWorkerByName("wordcount") // FIXME: get from task
+				if worker == nil {
+					log.Printf("[WORKER:%s] No worker implementation available", n.id)
+					time.Sleep(pollInterval)
+					continue
+				}
+				n.processor = NewProcessor(worker, n.client)
+			}
+
 			if err := n.processor.ProcessMapTask(task.MapTask, n.id); err != nil {
 				log.Printf("[WORKER:%s] Map task failed: %v", n.id, err)
 				// Notify master of failure

@@ -13,9 +13,17 @@ func (m *Master) GetNextTask(workerID string) protocol.Task {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// No current job, no tasks
+	if m.currentJobID == "" {
+		return protocol.Task{Type: protocol.TaskTypeNone}
+	}
+
+	job := m.jobs[m.currentJobID]
+	state := m.jobStates[m.currentJobID]
+
 	// Try to assign a map task first
-	if m.jobStatus == "mapping" {
-		for _, task := range m.mapTasks {
+	if job.Status == protocol.JobStatusRunning && state.mapTasksLeft > 0 {
+		for _, task := range state.mapTasks {
 			if task.Status == protocol.TaskStatusIdle {
 				return m.assignMapTask(task, workerID)
 			}
@@ -23,8 +31,8 @@ func (m *Master) GetNextTask(workerID string) protocol.Task {
 	}
 
 	// Try to assign a reduce task
-	if m.jobStatus == "reducing" {
-		for _, task := range m.reduceTasks {
+	if job.Status == protocol.JobStatusRunning && state.mapTasksLeft == 0 {
+		for _, task := range state.reduceTasks {
 			if task.Status == protocol.TaskStatusIdle {
 				return m.assignReduceTask(task, workerID)
 			}
@@ -84,9 +92,17 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// No current job
+	if m.currentJobID == "" {
+		return false
+	}
+
+	state := m.jobStates[m.currentJobID]
+	job := m.jobs[m.currentJobID]
+
 	// Find the task
 	var task *protocol.MapTask
-	for _, t := range m.mapTasks {
+	for _, t := range state.mapTasks {
 		if t.ID == taskID {
 			task = t
 			break
@@ -115,18 +131,29 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 	if success {
 		task.Status = protocol.TaskStatusCompleted
 		task.CompletedAt = time.Now()
-		m.mapTasksLeft--
-		log.Printf("[MASTER] Map task %s completed by worker %s (%d tasks left)",
-			taskID, workerID, m.mapTasksLeft)
+		state.mapTasksLeft--
+		job.MapTasksDone++
+		job.CompletedTasks++
+		log.Printf("[MASTER] Job %s: Map task %s completed by worker %s (%d tasks left)",
+			m.currentJobID, taskID, workerID, state.mapTasksLeft)
+
+		// Persist task completion
+		if err := m.storage.SaveJob(job); err != nil {
+			log.Printf("[MASTER] Warning: Failed to persist job: %v", err)
+		}
+		if err := m.storage.SaveJobState(m.currentJobID, state); err != nil {
+			log.Printf("[MASTER] Warning: Failed to persist job state: %v", err)
+		}
 
 		// Check if we should transition to reduce phase
-		if m.mapTasksLeft == 0 {
+		if state.mapTasksLeft == 0 {
 			go m.transitionToReducePhase()
 		}
 	} else {
 		task.Status = protocol.TaskStatusFailed
 		task.RetryCount++
-		log.Printf("[MASTER] Map task %s failed: %s (retry %d)", taskID, errorMsg, task.RetryCount)
+		log.Printf("[MASTER] Job %s: Map task %s failed: %s (retry %d)",
+			m.currentJobID, taskID, errorMsg, task.RetryCount)
 
 		// Reset to idle for retry
 		if task.RetryCount < 3 {
@@ -148,9 +175,17 @@ func (m *Master) CompleteReduceTask(taskID, workerID, version string, success bo
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// No current job
+	if m.currentJobID == "" {
+		return false
+	}
+
+	state := m.jobStates[m.currentJobID]
+	job := m.jobs[m.currentJobID]
+
 	// Find the task
 	var task *protocol.ReduceTask
-	for _, t := range m.reduceTasks {
+	for _, t := range state.reduceTasks {
 		if t.ID == taskID {
 			task = t
 			break
@@ -179,18 +214,29 @@ func (m *Master) CompleteReduceTask(taskID, workerID, version string, success bo
 	if success {
 		task.Status = protocol.TaskStatusCompleted
 		task.CompletedAt = time.Now()
-		m.reduceTasksLeft--
-		log.Printf("[MASTER] Reduce task %s (partition %d) completed by worker %s (%d tasks left)",
-			taskID, task.Partition, workerID, m.reduceTasksLeft)
+		state.reduceTasksLeft--
+		job.ReduceTasksDone++
+		job.CompletedTasks++
+		log.Printf("[MASTER] Job %s: Reduce task %s (partition %d) completed by worker %s (%d tasks left)",
+			m.currentJobID, taskID, task.Partition, workerID, state.reduceTasksLeft)
+
+		// Persist task completion
+		if err := m.storage.SaveJob(job); err != nil {
+			log.Printf("[MASTER] Warning: Failed to persist job: %v", err)
+		}
+		if err := m.storage.SaveJobState(m.currentJobID, state); err != nil {
+			log.Printf("[MASTER] Warning: Failed to persist job state: %v", err)
+		}
 
 		// Check if job is complete
-		if m.reduceTasksLeft == 0 {
+		if state.reduceTasksLeft == 0 {
 			go m.checkJobCompletion()
 		}
 	} else {
 		task.Status = protocol.TaskStatusFailed
 		task.RetryCount++
-		log.Printf("[MASTER] Reduce task %s failed: %s (retry %d)", taskID, errorMsg, task.RetryCount)
+		log.Printf("[MASTER] Job %s: Reduce task %s failed: %s (retry %d)",
+			m.currentJobID, taskID, errorMsg, task.RetryCount)
 
 		// Reset to idle for retry
 		if task.RetryCount < 3 {

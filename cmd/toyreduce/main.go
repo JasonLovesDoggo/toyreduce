@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/cache"
@@ -29,6 +28,16 @@ func main() {
 		runMasterMode()
 	case "worker":
 		runWorkerMode()
+	case "submit":
+		runSubmitJob()
+	case "jobs":
+		runListJobs()
+	case "status":
+		runJobStatus()
+	case "results":
+		runJobResults()
+	case "cancel":
+		runCancelJob()
 	case "list-executors":
 		listExecutors()
 	case "help", "--help", "-h":
@@ -65,57 +74,33 @@ func runMasterMode() {
 	fs := flag.NewFlagSet("master", flag.ExitOnError)
 	port := fs.Int("port", 8080, "Port for master server")
 	cacheURL := fs.String("cache-url", "http://localhost:8081", "URL of cache server")
-	executor := fs.String("executor", "", "Executor to use (run 'toyreduce list-executors')")
-	path := fs.String("path", "", "Path to input file")
-	chunkSize := fs.Int("chunk-size", 1000, "Number of lines per chunk")
-	reduceTasks := fs.Int("reduce-tasks", 4, "Number of reduce tasks (R partitions)")
 	heartbeatTimeout := fs.Duration("heartbeat-timeout", 30*time.Second, "Worker heartbeat timeout")
+	dbPath := fs.String("db-path", "var/master.db", "Path to bbolt database for persistence (empty = no persistence)")
 
 	fs.Parse(os.Args[2:])
 
-	// Validate required flags
-	if *executor == "" {
-		log.Fatal("--executor is required (run 'toyreduce list-executors')")
-	}
-	if !workers.IsValidExecutor(*executor) {
-		log.Fatalf("Invalid executor: %s (run 'toyreduce list-executors')", *executor)
-	}
-	if *path == "" {
-		log.Fatal("--path is required")
-	}
-
-	absPath, err := filepath.Abs(*path)
-	if err != nil {
-		log.Fatalf("Invalid path: %v", err)
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		log.Fatalf("File does not exist: %s", absPath)
-	}
-
 	log.Printf("Starting ToyReduce master node on port %d", *port)
 	log.Printf("  Cache URL: %s", *cacheURL)
-	log.Printf("  Executor: %s", *executor)
-	log.Printf("  Input: %s", absPath)
-	log.Printf("  Chunk size: %d", *chunkSize)
-	log.Printf("  Reduce tasks: %d", *reduceTasks)
+	log.Printf("  Heartbeat timeout: %v", *heartbeatTimeout)
+	if *dbPath != "" {
+		log.Printf("  Persistence: enabled (%s)", *dbPath)
+	} else {
+		log.Printf("  Persistence: disabled")
+	}
+	log.Printf("  Ready to accept job submissions at POST /api/jobs")
 
 	cfg := master.Config{
 		Port:             *port,
 		CacheURL:         *cacheURL,
-		InputPath:        absPath,
-		ChunkSize:        *chunkSize,
-		ReduceTasks:      *reduceTasks,
-		Worker:           workers.GetWorker(*executor),
-		ExecutorName:     *executor,
 		HeartbeatTimeout: *heartbeatTimeout,
+		DBPath:           *dbPath,
 	}
 
 	server, err := master.NewServer(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create master: %v", err)
 	}
+	defer server.Close()
 
 	if err := server.Start(*port); err != nil {
 		log.Fatalf("Master server error: %v", err)
@@ -145,6 +130,78 @@ func runWorkerMode() {
 	}
 }
 
+func runSubmitJob() {
+	fs := flag.NewFlagSet("submit", flag.ExitOnError)
+	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
+	executor := fs.String("executor", "", "Executor to use (required)")
+	path := fs.String("path", "", "Path to input file (required)")
+	chunkSize := fs.Int("chunk-size", 1000, "Lines per chunk")
+	reduceTasks := fs.Int("reduce-tasks", 4, "Number of reduce tasks")
+
+	fs.Parse(os.Args[2:])
+
+	if *executor == "" || *path == "" {
+		fmt.Println("Error: --executor and --path are required")
+		fs.PrintDefaults()
+		os.Exit(1)
+	}
+
+	submitJobHTTP(*masterURL, *executor, *path, *chunkSize, *reduceTasks)
+}
+
+func runListJobs() {
+	fs := flag.NewFlagSet("jobs", flag.ExitOnError)
+	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
+	fs.Parse(os.Args[2:])
+
+	listJobsHTTP(*masterURL)
+}
+
+func runJobStatus() {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
+	jobID := fs.String("job-id", "", "Job ID (required)")
+	fs.Parse(os.Args[2:])
+
+	if *jobID == "" {
+		fmt.Println("Error: --job-id is required")
+		fs.PrintDefaults()
+		os.Exit(1)
+	}
+
+	getJobStatusHTTP(*masterURL, *jobID)
+}
+
+func runJobResults() {
+	fs := flag.NewFlagSet("results", flag.ExitOnError)
+	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
+	jobID := fs.String("job-id", "", "Job ID (required)")
+	fs.Parse(os.Args[2:])
+
+	if *jobID == "" {
+		fmt.Println("Error: --job-id is required")
+		fs.PrintDefaults()
+		os.Exit(1)
+	}
+
+	getJobResultsHTTP(*masterURL, *jobID)
+}
+
+func runCancelJob() {
+	fs := flag.NewFlagSet("cancel", flag.ExitOnError)
+	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
+	jobID := fs.String("job-id", "", "Job ID (required)")
+	fs.Parse(os.Args[2:])
+
+	if *jobID == "" {
+		fmt.Println("Error: --job-id is required")
+		fs.PrintDefaults()
+		os.Exit(1)
+	}
+
+	cancelJobHTTP(*masterURL, *jobID)
+}
+
 func listExecutors() {
 	fmt.Println("Available executors:")
 	for _, name := range workers.ListExecutors() {
@@ -162,10 +219,19 @@ func printUsage() {
 Usage:
   toyreduce <command> [options]
 
-Commands:
+Server Commands (long-running processes):
   cache             Start a cache node
   master            Start a master node
   worker            Start a worker node
+
+Client Commands (job management):
+  submit            Submit a new MapReduce job
+  jobs              List all jobs
+  status            Get status of a specific job
+  results           Get results of a completed job
+  cancel            Cancel a queued or running job
+
+Utility Commands:
   list-executors    List available executors
   help              Show this help message
 
@@ -176,10 +242,6 @@ Cache Node Options:
 Master Node Options:
   --port            Port for master server (default: 8080)
   --cache-url       URL of cache server (default: http://localhost:8081)
-  --executor        Executor to use (required)
-  --path            Path to input file (required)
-  --chunk-size      Lines per chunk (default: 1000)
-  --reduce-tasks    Number of reduce tasks/partitions (default: 4)
   --heartbeat-timeout  Worker heartbeat timeout (default: 30s)
 
 Worker Node Options:
@@ -187,17 +249,42 @@ Worker Node Options:
   --poll-interval   Task polling interval (default: 2s)
   --heartbeat-interval  Heartbeat interval (default: 10s)
 
+Submit Job Options:
+  --master-url      URL of master server (default: http://localhost:8080)
+  --executor        Executor to use (required)
+  --path            Path to input file (required)
+  --chunk-size      Lines per chunk (default: 1000)
+  --reduce-tasks    Number of reduce tasks (default: 4)
+
+Job Management Options:
+  --master-url      URL of master server (default: http://localhost:8080)
+  --job-id          Job ID (required for status/results/cancel)
+
 Example Usage:
   # Terminal 1: Start cache
-  toyreduce cache --port 8081
+  toyreduce cache
 
   # Terminal 2: Start master
-  toyreduce master --cache-url http://localhost:8081 \
-      --executor wordcount --path data.log --reduce-tasks 4
+  toyreduce master
 
   # Terminal 3+: Start workers
-  toyreduce worker --master-url http://localhost:8080
-  toyreduce worker --master-url http://localhost:8080
+  toyreduce worker
+  toyreduce worker
+
+  # Submit a job
+  toyreduce submit --executor wordcount --path data.log --reduce-tasks 4
+
+  # List all jobs
+  toyreduce jobs
+
+  # Check job status
+  toyreduce status --job-id <job-id>
+
+  # Get results when complete
+  toyreduce results --job-id <job-id>
+
+  # Cancel a job
+  toyreduce cancel --job-id <job-id>
 
   # List available executors
   toyreduce list-executors

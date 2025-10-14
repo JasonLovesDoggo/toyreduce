@@ -59,14 +59,17 @@ type Task struct {
 
 // WorkerRegistrationRequest is sent by workers to register with master
 type WorkerRegistrationRequest struct {
-	WorkerID string `json:"worker_id"`
+	WorkerID  string   `json:"worker_id"`
+	Version   string   `json:"version"`   // ToyReduce version
+	Executors []string `json:"executors"` // Supported executors
 }
 
 // WorkerRegistrationResponse is returned to workers upon registration
 type WorkerRegistrationResponse struct {
-	WorkerID     string `json:"worker_id"`
-	CacheURL     string `json:"cache_url"`
-	ExecutorName string `json:"executor_name"`
+	WorkerID string `json:"worker_id"`
+	CacheURL string `json:"cache_url"`
+	Success  bool   `json:"success"`
+	Error    string `json:"error,omitempty"`
 }
 
 // TaskCompletionRequest is sent by workers when they complete a task

@@ -28,9 +28,11 @@ func NewClient(masterURL string) *Client {
 }
 
 // Register registers this worker with the master
-func (c *Client) Register(workerID string) (*protocol.WorkerRegistrationResponse, error) {
+func (c *Client) Register(workerID string, version string, executors []string) (*protocol.WorkerRegistrationResponse, error) {
 	req := protocol.WorkerRegistrationRequest{
-		WorkerID: workerID,
+		WorkerID:  workerID,
+		Version:   version,
+		Executors: executors,
 	}
 
 	body, err := json.Marshal(req)
@@ -48,13 +50,14 @@ func (c *Client) Register(workerID string) (*protocol.WorkerRegistrationResponse
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("registration failed: %s", resp.Status)
-	}
-
 	var regResp protocol.WorkerRegistrationResponse
 	if err := json.NewDecoder(resp.Body).Decode(&regResp); err != nil {
 		return nil, err
+	}
+
+	// Check if registration was successful
+	if !regResp.Success {
+		return nil, fmt.Errorf("registration failed: %s", regResp.Error)
 	}
 
 	// Store cache URL

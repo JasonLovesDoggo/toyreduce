@@ -118,7 +118,7 @@
 						Intermediate Keys
 					</div>
 					<div class="text-3xl font-semibold text-[var(--fg)] tabular-nums">
-						{stats.intermediate_keys || 0}
+						{stats.intermediate_kvs || 0}
 					</div>
 				</div>
 				<div>
@@ -134,7 +134,7 @@
 						Total Size
 					</div>
 					<div class="text-3xl font-semibold text-[var(--fg)] tabular-nums">
-						{stats.size_bytes ? (stats.size_bytes / 1024 / 1024).toFixed(2) : 0} MB
+						{stats.db_size_bytes ? (stats.db_size_bytes / 1024 / 1024).toFixed(2) : 0} MB
 					</div>
 				</div>
 			</div>

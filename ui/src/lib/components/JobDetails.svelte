@@ -1,16 +1,33 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 
 	let { job, API_BASE, onCancel } = $props<{ job: any; API_BASE: string; onCancel: () => void }>();
 
 	const { close } = getContext('simple-modal');
 
+	let currentJob = $state(job);
 	let jobResults = $state<any[]>([]);
 	let loadingResults = $state(false);
 
-	// Load results when component mounts if job is completed
+	// Poll for job updates while modal is open
+	onMount(() => {
+		const interval = setInterval(async () => {
+			try {
+				const res = await fetch(`${API_BASE}/api/jobs/${currentJob.id}`);
+				if (res.ok) {
+					currentJob = await res.json();
+				}
+			} catch (err) {
+				console.error('Failed to fetch job:', err);
+			}
+		}, 1000);
+
+		return () => clearInterval(interval);
+	});
+
+	// Load results when job status becomes completed
 	$effect(() => {
-		if (job.status === 'completed') {
+		if (currentJob.status === 'completed' && jobResults.length === 0) {
 			loadResults();
 		}
 	});
@@ -18,7 +35,7 @@
 	async function loadResults() {
 		loadingResults = true;
 		try {
-			const res = await fetch(`${API_BASE}/api/jobs/${job.id}/results`);
+			const res = await fetch(`${API_BASE}/api/jobs/${currentJob.id}/results`);
 			if (res.ok) {
 				jobResults = await res.json();
 			}
@@ -90,15 +107,16 @@
 			<div class="mb-3 flex items-center gap-3">
 				<h3 class="text-xl font-bold text-[var(--fg)]">Job Details</h3>
 				<span
-					class={`border px-3 py-1 text-xs font-semibold tracking-wider uppercase ${getStatusColor(job.status)}`}
+					class={`border px-3 py-1 text-xs font-semibold tracking-wider uppercase ${getStatusColor(currentJob.status)}`}
 				>
-					{job.status}
+					{currentJob.status}
 				</span>
 			</div>
-			<p class="font-mono text-sm text-[var(--text-muted)]">{job.id}</p>
+			<p class="font-mono text-sm text-[var(--text-muted)]">{currentJob.id}</p>
 		</div>
 		<button
 			onclick={close}
+			aria-label="Close dialog"
 			class="rounded p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--fg)]"
 		>
 			<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,22 +133,22 @@
 
 <div class="space-y-6 p-8">
 	<!-- Hero Section - Duration -->
-	{#if job.duration}
+	{#if currentJob.duration}
 		<div class="border border-[var(--accent)] bg-[var(--surface)] p-8 text-center">
 			<div class="mb-2 text-xs font-semibold tracking-wider text-[var(--text-muted)] uppercase">
 				Total Duration
 			</div>
 			<div class="text-5xl font-bold tracking-tight text-[var(--fg)] tabular-nums">
-				{formatDuration(job.duration)}
+				{formatDuration(currentJob.duration)}
 			</div>
-			{#if job.status === 'running'}
+			{#if currentJob.status === 'running'}
 				<div class="mt-3 text-sm text-[var(--text-muted)]">Job in progress...</div>
 			{/if}
 		</div>
 	{/if}
 
 	<!-- Metrics Cards Grid -->
-	{#if job.status === 'running' || job.status === 'completed'}
+	{#if currentJob.status === 'running' || currentJob.status === 'completed'}
 		<div class="grid grid-cols-2 gap-4">
 			<!-- Map Phase Card -->
 			<div class="border border-[var(--border)] bg-[var(--surface)] p-6">
@@ -155,22 +173,22 @@
 				<div class="space-y-4">
 					<div>
 						<div class="text-3xl font-bold text-[var(--fg)] tabular-nums">
-							{job.map_tasks_done}/{job.map_tasks_total}
+							{currentJob.map_tasks_done}/{currentJob.map_tasks_total}
 						</div>
 						<div class="mt-1 text-xs text-[var(--text-muted)]">Tasks Completed</div>
 					</div>
-					{#if job.map_phase_duration}
+					{#if currentJob.map_phase_duration}
 						<div class="border-t border-[var(--border)] pt-4">
 							<div class="flex justify-between">
 								<span class="text-xs text-[var(--text-muted)]">Duration</span>
 								<span class="font-mono text-sm font-semibold text-[var(--fg)]"
-									>{formatDuration(job.map_phase_duration)}</span
+									>{formatDuration(currentJob.map_phase_duration)}</span
 								>
 							</div>
 							<div class="mt-2 flex justify-between">
 								<span class="text-xs text-[var(--text-muted)]">Throughput</span>
 								<span class="font-mono text-sm font-semibold text-[var(--fg)]"
-									>{formatTaskThroughput(job.map_tasks_done, job.map_phase_duration)} tasks/s</span
+									>{formatTaskThroughput(currentJob.map_tasks_done, currentJob.map_phase_duration)} tasks/s</span
 								>
 							</div>
 						</div>
@@ -201,22 +219,22 @@
 				<div class="space-y-4">
 					<div>
 						<div class="text-3xl font-bold text-[var(--fg)] tabular-nums">
-							{job.reduce_tasks_done}/{job.reduce_tasks_total}
+							{currentJob.reduce_tasks_done}/{currentJob.reduce_tasks_total}
 						</div>
 						<div class="mt-1 text-xs text-[var(--text-muted)]">Tasks Completed</div>
 					</div>
-					{#if job.reduce_phase_duration}
+					{#if currentJob.reduce_phase_duration}
 						<div class="border-t border-[var(--border)] pt-4">
 							<div class="flex justify-between">
 								<span class="text-xs text-[var(--text-muted)]">Duration</span>
 								<span class="font-mono text-sm font-semibold text-[var(--fg)]"
-									>{formatDuration(job.reduce_phase_duration)}</span
+									>{formatDuration(currentJob.reduce_phase_duration)}</span
 								>
 							</div>
 							<div class="mt-2 flex justify-between">
 								<span class="text-xs text-[var(--text-muted)]">Throughput</span>
 								<span class="font-mono text-sm font-semibold text-[var(--fg)]"
-									>{formatTaskThroughput(job.reduce_tasks_done, job.reduce_phase_duration)} tasks/s</span
+									>{formatTaskThroughput(currentJob.reduce_tasks_done, currentJob.reduce_phase_duration)} tasks/s</span
 								>
 							</div>
 						</div>
@@ -232,18 +250,18 @@
 					>Overall Progress</span
 				>
 				<span class="text-2xl font-bold text-[var(--accent)] tabular-nums"
-					>{getProgressPercent(job)}%</span
+					>{getProgressPercent(currentJob)}%</span
 				>
 			</div>
 			<div class="h-3 w-full bg-[var(--border)]">
 				<div
 					class="h-3 bg-[var(--accent)] transition-all"
-					style="width: {getProgressPercent(job)}%"
+					style="width: {getProgressPercent(currentJob)}%"
 				></div>
 			</div>
 			<div class="mt-3 flex justify-between text-xs text-[var(--text-muted)]">
-				<span>{job.completed_tasks} / {job.total_tasks} tasks</span>
-				<span>{job.total_tasks - job.completed_tasks} remaining</span>
+				<span>{currentJob.completed_tasks} / {currentJob.total_tasks} tasks</span>
+				<span>{currentJob.total_tasks - currentJob.completed_tasks} remaining</span>
 			</div>
 		</div>
 	{/if}
@@ -256,19 +274,19 @@
 		<div class="grid grid-cols-2 gap-4">
 			<div>
 				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">Executor</div>
-				<div class="font-mono text-sm text-[var(--fg)]">{job.executor}</div>
+				<div class="font-mono text-sm text-[var(--fg)]">{currentJob.executor}</div>
 			</div>
 			<div>
 				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">
 					Chunk Size
 				</div>
-				<div class="font-mono text-sm text-[var(--fg)] tabular-nums">{job.chunk_size}</div>
+				<div class="font-mono text-sm text-[var(--fg)] tabular-nums">{currentJob.chunk_size}</div>
 			</div>
 			<div class="col-span-2">
 				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">
 					Input Path
 				</div>
-				<div class="font-mono text-xs text-[var(--fg)]">{job.input_path}</div>
+				<div class="font-mono text-xs text-[var(--fg)]">{currentJob.input_path}</div>
 			</div>
 		</div>
 	</div>
@@ -283,21 +301,21 @@
 				</div>
 				<div class="flex-1">
 					<div class="text-xs text-[var(--text-muted)]">Submitted</div>
-					<div class="font-mono text-xs text-[var(--fg)]">{formatDate(job.submitted_at)}</div>
+					<div class="font-mono text-xs text-[var(--fg)]">{formatDate(currentJob.submitted_at)}</div>
 				</div>
 			</div>
-			{#if job.started_at}
+			{#if currentJob.started_at}
 				<div class="flex items-center gap-4">
 					<div class="flex-shrink-0">
 						<div class="h-2 w-2 rounded-full bg-[var(--accent)]"></div>
 					</div>
 					<div class="flex-1">
 						<div class="text-xs text-[var(--text-muted)]">Started</div>
-						<div class="font-mono text-xs text-[var(--fg)]">{formatDate(job.started_at)}</div>
+						<div class="font-mono text-xs text-[var(--fg)]">{formatDate(currentJob.started_at)}</div>
 					</div>
 				</div>
 			{/if}
-			{#if job.map_phase_completed_at}
+			{#if currentJob.map_phase_completed_at}
 				<div class="flex items-center gap-4">
 					<div class="flex-shrink-0">
 						<div class="h-2 w-2 rounded-full bg-[var(--accent)]"></div>
@@ -305,19 +323,19 @@
 					<div class="flex-1">
 						<div class="text-xs text-[var(--text-muted)]">Map Phase Complete</div>
 						<div class="font-mono text-xs text-[var(--fg)]">
-							{formatDate(job.map_phase_completed_at)}
+							{formatDate(currentJob.map_phase_completed_at)}
 						</div>
 					</div>
 				</div>
 			{/if}
-			{#if job.completed_at}
+			{#if currentJob.completed_at}
 				<div class="flex items-center gap-4">
 					<div class="flex-shrink-0">
 						<div class="h-2 w-2 rounded-full bg-green-500"></div>
 					</div>
 					<div class="flex-1">
 						<div class="text-xs text-[var(--text-muted)]">Completed</div>
-						<div class="font-mono text-xs text-[var(--fg)]">{formatDate(job.completed_at)}</div>
+						<div class="font-mono text-xs text-[var(--fg)]">{formatDate(currentJob.completed_at)}</div>
 					</div>
 				</div>
 			{/if}
@@ -325,7 +343,7 @@
 	</div>
 
 	<!-- Results -->
-	{#if job.status === 'completed'}
+	{#if currentJob.status === 'completed'}
 		<div class="border border-[var(--border)] bg-[var(--surface)] p-4">
 			<h4 class="mb-3 text-sm font-semibold tracking-wider text-[var(--fg)] uppercase">Results</h4>
 			{#if loadingResults}
@@ -362,16 +380,16 @@
 	{/if}
 
 	<!-- Error -->
-	{#if job.error}
+	{#if currentJob.error}
 		<div class="border border-red-500 bg-[var(--surface)] p-4">
 			<h4 class="mb-2 text-sm font-semibold tracking-wider text-red-600 uppercase">Error</h4>
-			<p class="font-mono text-xs text-red-600">{job.error}</p>
+			<p class="font-mono text-xs text-red-600">{currentJob.error}</p>
 		</div>
 	{/if}
 
 	<!-- Actions -->
 	<div class="flex gap-3">
-		{#if job.status === 'queued' || job.status === 'running'}
+		{#if currentJob.status === 'queued' || currentJob.status === 'running'}
 			<button
 				onclick={handleCancel}
 				class="flex-1 bg-red-600 px-4 py-2 text-xs tracking-wider text-white uppercase transition-opacity hover:opacity-80"

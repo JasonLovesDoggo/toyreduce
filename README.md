@@ -1,15 +1,17 @@
 # ToyReduce
 
-ToyReduce is a lightweight distributed MapReduce system written in Go.  
-It implements the core ideas from Google’s MapReduce paper: **automatic parallelization, fault-tolerant task scheduling, and key-based data partitioning** — all over plain HTTP.
+ToyReduce is a lightweight distributed MapReduce system written in Go.
+It implements the core ideas from Google's MapReduce paper: **automatic parallelization, fault-tolerant task scheduling, and key-based data partitioning** — all over plain HTTP.
+
+Includes a **real-time web UI** with detailed performance metrics, job monitoring, and worker status tracking.
 
 ## Overview
 
 The system runs three types of nodes:
 
-- **Master:** splits the input file into chunks, tracks map/reduce task states, and assigns work to idle workers.  
-- **Worker:** executes map and reduce functions, fetching tasks from the master and storing results in the cache.  
-- **Cache:** acts as centralized storage for intermediate key-value pairs between map and reduce stages.
+- **Master:** Splits input files into chunks, manages job queue, tracks map/reduce task states, and assigns work to idle workers. Includes embedded web UI for job submission and monitoring.
+- **Worker:** Executes map and reduce functions, fetching tasks from the master and storing results in the cache.
+- **Cache:** Acts as centralized storage for intermediate key-value pairs between map and reduce stages.
 
 This setup makes it easy to observe how MapReduce behaves without external systems like Hadoop or Spark.
 

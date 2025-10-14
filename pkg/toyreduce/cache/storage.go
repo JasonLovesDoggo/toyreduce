@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 
 	"go.etcd.io/bbolt"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
@@ -19,8 +20,9 @@ var (
 
 // Storage manages intermediate and final K-V data using bbolt
 type Storage struct {
-	db   *bbolt.DB
-	path string
+	db      *bbolt.DB
+	path    string
+	counter atomic.Uint64 // Counter for append-only keys
 }
 
 // NewStorage creates a new bbolt-backed storage instance

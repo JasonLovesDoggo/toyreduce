@@ -21,13 +21,41 @@
 	let results = $state<ResultRow[]>([]);
 	let loading = $state(true);
 	let pageSize = $state(50);
+	let searchInput = $state('');
+	let debounceTimer: any = null;
 
-	// Fetch all results from cache (cache server runs on port 8081)
+	// Debounced search function
+	function debouncedSetGlobalFilter(value: string) {
+		if (debounceTimer) {
+			clearTimeout(debounceTimer);
+		}
+		debounceTimer = setTimeout(() => {
+			console.log('Applying filter:', value);
+			setGlobalFilter(value);
+		}, 300);
+	}
+
+	// Cleanup timer on component destroy
+	$effect(() => {
+		return () => {
+			if (debounceTimer) {
+				clearTimeout(debounceTimer);
+			}
+		};
+	});
+
+	// Handle search input with debouncing
+	function handleSearchInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		searchInput = target.value;
+		debouncedSetGlobalFilter(target.value);
+	}
+
+	// Fetch all results from master API
 	async function fetchResults() {
 		loading = true;
 		try {
-			const cacheURL = API_BASE.replace(':8080', ':8081');
-			const res = await fetch(`${cacheURL}/results`);
+			const res = await fetch(`${API_BASE}/api/results`);
 			if (res.ok) {
 				results = await res.json();
 			}
@@ -157,7 +185,8 @@
 		<div>
 			<input
 				type="text"
-				bind:value={globalFilter}
+				bind:value={searchInput}
+				oninput={handleSearchInput}
 				placeholder="Search all columns..."
 				class="w-full border border-[var(--border)] bg-[var(--bg)] px-4 py-2 text-sm text-[var(--fg)] placeholder-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none"
 			/>
@@ -165,22 +194,26 @@
 	</div>
 
 	{#if loading}
-		<div class="border border-[var(--border)] bg-[var(--surface)] p-16 text-center">
-			<div
-				class="inline-block h-8 w-8 animate-spin border-2 border-[var(--border)] border-t-[var(--accent)]"
-			></div>
-			<p class="mt-4 text-sm text-[var(--text-muted)]">Loading results...</p>
+		<div class="border border-[var(--border)] bg-[var(--surface)] p-16 text-center min-h-[400px] flex items-center justify-center">
+			<div class="text-center">
+				<div
+					class="inline-block h-8 w-8 animate-spin border-2 border-[var(--border)] border-t-[var(--accent)]"
+				></div>
+				<p class="mt-4 text-sm text-[var(--text-muted)]">Loading results...</p>
+			</div>
 		</div>
 	{:else if results.length === 0}
-		<div class="border border-[var(--border)] bg-[var(--surface)] p-16 text-center">
-			<p class="text-sm text-[var(--text-muted)]">No results available yet.</p>
-			<p class="mt-2 text-xs text-[var(--text-muted)]">
-				Submit and complete a job to see results here.
-			</p>
+		<div class="border border-[var(--border)] bg-[var(--surface)] p-16 text-center min-h-[400px] flex items-center justify-center">
+			<div class="text-center">
+				<p class="text-sm text-[var(--text-muted)]">No results available yet.</p>
+				<p class="mt-2 text-xs text-[var(--text-muted)]">
+					Submit and complete a job to see results here.
+				</p>
+			</div>
 		</div>
 	{:else}
 		<!-- Stats -->
-		<div class="border border-[var(--border)] bg-[var(--surface)] p-6">
+		<div class="border border-[var(--border)] bg-[var(--surface)] p-6 transition-opacity duration-200">
 			<div class="grid grid-cols-3 gap-8">
 				<div>
 					<div class="mb-2 text-xs tracking-wider text-[var(--text-muted)] uppercase">
@@ -293,7 +326,7 @@
 					<select
 						bind:value={pageSize}
 						onchange={(e) => $table.setPageSize(Number(e.currentTarget.value))}
-						class="border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--fg)]"
+						class="border border-[var(--border)] bg-[var(--surface)] px-3 py-1 pr-6 text-xs text-[var(--fg)]"
 					>
 						{#each [10, 25, 50, 100, 200] as pageSizeOption (pageSizeOption)}
 							<option value={pageSizeOption}>Show {pageSizeOption}</option>

@@ -69,6 +69,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("GET /api/jobs/{jobID}/results", s.handleJobResults)
 	s.mux.HandleFunc("POST /api/jobs/{jobID}/cancel", s.handleJobCancel)
 
+	// Results API
+	s.mux.HandleFunc("GET /api/results", s.handleAllResults)
+
 	// Config and Status
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /api/status", s.handleStatus)
@@ -403,6 +406,17 @@ func (s *Server) handleJobResults(w http.ResponseWriter, r *http.Request) {
 	results, err := s.master.GetJobResults(jobID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+func (s *Server) handleAllResults(w http.ResponseWriter, r *http.Request) {
+	results, err := s.master.getResultsFromCache()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

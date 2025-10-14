@@ -1,9 +1,16 @@
 <script lang="ts">
 	import { getContext, onMount } from 'svelte';
+	import type { Context } from 'svelte-simple-modal';
 
-	let { job, API_BASE, onCancel } = $props<{ job: any; API_BASE: string; onCancel: () => void }>();
+	interface Props {
+		job: any;
+		API_BASE: string;
+		onCancel: () => void;
+	}
 
-	const { close } = getContext('simple-modal');
+	let { job, API_BASE, onCancel }: Props = $props();
+
+	const { close } = getContext<Context>('simple-modal');
 
 	let currentJob = $state(job);
 	let jobResults = $state<any[]>([]);
@@ -115,7 +122,7 @@
 			<p class="font-mono text-sm text-[var(--text-muted)]">{currentJob.id}</p>
 		</div>
 		<button
-			onclick={close}
+			onclick={() => close()}
 			aria-label="Close dialog"
 			class="rounded p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--fg)]"
 		>
@@ -153,9 +160,7 @@
 			<!-- Map Phase Card -->
 			<div class="border border-[var(--border)] bg-[var(--surface)] p-6">
 				<div class="mb-4 flex items-center justify-between">
-					<h4 class="text-sm font-semibold tracking-wider text-[var(--fg)] uppercase">
-						Map Phase
-					</h4>
+					<h4 class="text-sm font-semibold tracking-wider text-[var(--fg)] uppercase">Map Phase</h4>
 					<svg
 						class="h-5 w-5 text-[var(--text-muted)]"
 						fill="none"
@@ -188,7 +193,7 @@
 							<div class="mt-2 flex justify-between">
 								<span class="text-xs text-[var(--text-muted)]">Throughput</span>
 								<span class="font-mono text-sm font-semibold text-[var(--fg)]"
-									>{formatTaskThroughput(currentJob.map_tasks_done, currentJob.map_phase_duration)} tasks/s</span
+									>{ formatTaskThroughput(currentJob.map_tasks_done, currentJob.map_phase_duration)} tasks/s</span
 								>
 							</div>
 						</div>
@@ -234,7 +239,10 @@
 							<div class="mt-2 flex justify-between">
 								<span class="text-xs text-[var(--text-muted)]">Throughput</span>
 								<span class="font-mono text-sm font-semibold text-[var(--fg)]"
-									>{formatTaskThroughput(currentJob.reduce_tasks_done, currentJob.reduce_phase_duration)} tasks/s</span
+									>{formatTaskThroughput(
+										currentJob.reduce_tasks_done,
+										currentJob.reduce_phase_duration
+									)} tasks/s</span
 								>
 							</div>
 						</div>
@@ -277,15 +285,11 @@
 				<div class="font-mono text-sm text-[var(--fg)]">{currentJob.executor}</div>
 			</div>
 			<div>
-				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">
-					Chunk Size
-				</div>
+				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">Chunk Size</div>
 				<div class="font-mono text-sm text-[var(--fg)] tabular-nums">{currentJob.chunk_size}</div>
 			</div>
 			<div class="col-span-2">
-				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">
-					Input Path
-				</div>
+				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">Input Path</div>
 				<div class="font-mono text-xs text-[var(--fg)]">{currentJob.input_path}</div>
 			</div>
 		</div>
@@ -301,7 +305,9 @@
 				</div>
 				<div class="flex-1">
 					<div class="text-xs text-[var(--text-muted)]">Submitted</div>
-					<div class="font-mono text-xs text-[var(--fg)]">{formatDate(currentJob.submitted_at)}</div>
+					<div class="font-mono text-xs text-[var(--fg)]">
+						{formatDate(currentJob.submitted_at)}
+					</div>
 				</div>
 			</div>
 			{#if currentJob.started_at}
@@ -311,7 +317,9 @@
 					</div>
 					<div class="flex-1">
 						<div class="text-xs text-[var(--text-muted)]">Started</div>
-						<div class="font-mono text-xs text-[var(--fg)]">{formatDate(currentJob.started_at)}</div>
+						<div class="font-mono text-xs text-[var(--fg)]">
+							{formatDate(currentJob.started_at)}
+						</div>
 					</div>
 				</div>
 			{/if}
@@ -335,7 +343,9 @@
 					</div>
 					<div class="flex-1">
 						<div class="text-xs text-[var(--text-muted)]">Completed</div>
-						<div class="font-mono text-xs text-[var(--fg)]">{formatDate(currentJob.completed_at)}</div>
+						<div class="font-mono text-xs text-[var(--fg)]">
+							{formatDate(currentJob.completed_at)}
+						</div>
 					</div>
 				</div>
 			{/if}
@@ -398,7 +408,7 @@
 			</button>
 		{/if}
 		<button
-			onclick={close}
+			onclick={() => close()}
 			class="flex-1 border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs tracking-wider text-[var(--fg)] uppercase transition-colors hover:border-[var(--accent)]"
 		>
 			Close

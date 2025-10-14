@@ -1,7 +1,14 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+	interface Props {
+		onSubmit: (data: {
+			executor: string;
+			input_path: string;
+			chunk_size: number;
+			reduce_tasks: number;
+		}) => void;
+	}
 
-	const dispatch = createEventDispatcher();
+	let { onSubmit }: Props = $props();
 
 	let executor = $state('wordcount');
 	let inputPath = $state('');
@@ -14,7 +21,7 @@
 		if (submitting) return;
 
 		submitting = true;
-		dispatch('submit', {
+		onSubmit({
 			executor,
 			input_path: inputPath,
 			chunk_size: chunkSize,
@@ -51,7 +58,6 @@
 					<option value="wordcount">wordcount</option>
 					<option value="actioncount">actioncount</option>
 				</select>
-
 			</div>
 
 			<!-- Input Path -->

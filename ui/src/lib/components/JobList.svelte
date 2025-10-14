@@ -1,11 +1,18 @@
 <script lang="ts">
-	import { createEventDispatcher, getContext } from 'svelte';
+	import { getContext } from 'svelte';
 	import JobDetails from './JobDetails.svelte';
+	import type { Context } from 'svelte-simple-modal';
 
-	const dispatch = createEventDispatcher();
-	const { open } = getContext('simple-modal');
+	const { open } = getContext<Context>('simple-modal');
 
-	let { jobs = [], API_BASE = '' } = $props<{ jobs: any[]; API_BASE: string }>();
+	interface Props {
+		jobs?: any[];
+		API_BASE?: string;
+		onCancel: (jobId: string) => void;
+		onRefresh?: () => void;
+	}
+
+	let { jobs = [], API_BASE = '', onCancel }: Props = $props();
 
 	function getStatusColor(status: string) {
 		switch (status) {
@@ -28,34 +35,13 @@
 		return new Date(date).toLocaleString();
 	}
 
-	function formatDuration(seconds: number): string {
-		if (!seconds || seconds === 0) return '—';
-
-		const hours = Math.floor(seconds / 3600);
-		const minutes = Math.floor((seconds % 3600) / 60);
-		const secs = Math.floor(seconds % 60);
-
-		if (hours > 0) {
-			return `${hours}h ${minutes}m ${secs}s`;
-		} else if (minutes > 0) {
-			return `${minutes}m ${secs}s`;
-		} else {
-			return `${secs}s`;
-		}
-	}
-
-	function formatTaskThroughput(tasks: number, seconds: number): string {
-		if (!seconds || seconds === 0 || !tasks) return '—';
-		const throughput = tasks / seconds;
-		return throughput < 1 ? throughput.toFixed(2) : throughput.toFixed(1);
-	}
-
 	function showDetails(job: any) {
+		// @ts-expect-error - svelte-simple-modal not yet compatible with Svelte 5 component types
 		open(JobDetails, {
 			job,
 			API_BASE,
 			onCancel: () => {
-				dispatch('cancel', job.id);
+				onCancel(job.id);
 			}
 		});
 	}

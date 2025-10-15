@@ -2,7 +2,7 @@
 
 A tiny, hackable distributed MapReduce system written in Go.
 
-It implements the core ideas from Google's MapReduce paper with some aspects of Hadoop's architecture: **automatic parallelization, fault-tolerant task scheduling, distributed intermediate storage, and peer-to-peer data transfer** — all over plain HTTP.
+It implements the core ideas from Google's MapReduce paper with some aspects of Hadoop's architecture: **automatic parallelization, fault-tolerant task scheduling, distributed intermediate storage, and peer-to-peer data transfer** over plain HTTP.
 
 Workers store intermediate data locally and shuffle via P2P, eliminating the centralized storage bottleneck. Includes a real-time web UI for job monitoring and submission.
 

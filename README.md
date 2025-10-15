@@ -24,8 +24,6 @@ toyreduce submit --executor wordcount --path /var/data/randomfile --reduce-tasks
 # Job submitted successfully!
 #   Job ID: 550e8400-e29b-41d4-a716-446655440000
 #   Status: pending
-#
-# Check status with: toyreduce status --job-id 550e8400-e29b-41d4-a716-446655440000
 
 # View results
 toyreduce results --job-id 550e8400-e29b-41d4-a716-446655440000

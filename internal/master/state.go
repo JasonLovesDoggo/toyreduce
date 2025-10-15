@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
-	"pkg.jsn.cam/toyreduce/workers"
+	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 // WorkerInfo tracks information about a registered worker

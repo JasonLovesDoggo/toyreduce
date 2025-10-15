@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"pkg.jsn.cam/toyreduce/pkg/toyreduce/httpx"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
+	"pkg.jsn.cam/toyreduce/pkg/utils/httpx"
 )
 
 // Server wraps the storage and HTTP server

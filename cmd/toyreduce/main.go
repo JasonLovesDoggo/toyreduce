@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	"pkg.jsn.cam/toyreduce/pkg/toyreduce/cache"
-	"pkg.jsn.cam/toyreduce/pkg/toyreduce/master"
-	"pkg.jsn.cam/toyreduce/pkg/toyreduce/worker"
-	"pkg.jsn.cam/toyreduce/workers"
+	master2 "pkg.jsn.cam/toyreduce/internal/master"
+	"pkg.jsn.cam/toyreduce/internal/worker"
+	"pkg.jsn.cam/toyreduce/pkg/cache"
+	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 func main() {
@@ -89,14 +89,14 @@ func runMasterMode() {
 	}
 	log.Printf("  Ready to accept job submissions at POST /api/jobs")
 
-	cfg := master.Config{
+	cfg := master2.Config{
 		Port:             *port,
 		CacheURL:         *cacheURL,
 		HeartbeatTimeout: *heartbeatTimeout,
 		DBPath:           *dbPath,
 	}
 
-	server, err := master.NewServer(cfg)
+	server, err := master2.NewServer(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create master: %v", err)
 	}

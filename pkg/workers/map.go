@@ -2,10 +2,9 @@ package workers
 
 import (
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
-	"pkg.jsn.cam/toyreduce/workers/actioncount"
+	"pkg.jsn.cam/toyreduce/pkg/workers/actioncount"
+	"pkg.jsn.cam/toyreduce/pkg/workers/wordcount"
 )
-
-import "pkg.jsn.cam/toyreduce/workers/wordcount"
 
 var Executors = map[string]toyreduce.Worker{
 	"wordcount":   wordcount.WordCountWorker{},

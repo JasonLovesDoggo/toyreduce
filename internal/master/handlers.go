@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"pkg.jsn.cam/toyreduce/pkg/toyreduce/httpx"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
+	"pkg.jsn.cam/toyreduce/pkg/utils/httpx"
 )
 
 //go:embed all:static

@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
-	"pkg.jsn.cam/toyreduce/workers"
+	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 // persist saves the current state to storage

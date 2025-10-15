@@ -94,7 +94,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 	log.Printf("[WORKER:%s] Reduce produced %d results", workerID, len(results))
 
 	// Store results in cache
-	if err := p.client.StoreReduceOutput(task.ID, results); err != nil {
+	if err := p.client.StoreReduceOutput(task.ID, task.JobID, results); err != nil {
 		return fmt.Errorf("store reduce output error: %w", err)
 	}
 

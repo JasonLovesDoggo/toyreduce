@@ -90,8 +90,6 @@
 					id="chunkSize"
 					type="number"
 					bind:value={chunkSize}
-					min="100"
-					max="10000"
 					class="w-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--fg)] tabular-nums focus:border-[var(--accent)] focus:outline-none"
 					required
 				/>

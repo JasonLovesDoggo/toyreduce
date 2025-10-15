@@ -7,6 +7,7 @@
 	import JobSubmitForm from '$lib/components/JobSubmitForm.svelte';
 	import CacheVisualization from '$lib/components/CacheVisualization.svelte';
 	import ResultsViewer from '$lib/components/ResultsViewer.svelte';
+	import { formatRelativeTime } from '$lib/utils/date';
 
 	const API_BASE = 'http://localhost:8080';
 
@@ -16,28 +17,20 @@
 	let loading = $state(true);
 	let error = $state('');
 
-	// Get active tab from URL query parameter
+	// Get active tab and job from URL query parameters
 	let activeTab = $derived<'jobs' | 'results' | 'cache' | 'workers'>(
 		(page.url.searchParams.get('tab') as 'jobs' | 'results' | 'cache' | 'workers') || 'jobs'
 	);
+	let selectedJobID = $derived(page.url.searchParams.get('job') || '');
 
 	function setTab(tab: 'jobs' | 'results' | 'cache' | 'workers') {
 		goto(`?tab=${tab}`, { replaceState: false, keepFocus: true });
 	}
 
-	function formatTimeSince(timestamp: string): string {
-		const date = new Date(timestamp);
-		const now = new Date();
-		const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-		if (seconds < 60) return `${seconds}s ago`;
-		const minutes = Math.floor(seconds / 60);
-		if (minutes < 60) return `${minutes}m ago`;
-		const hours = Math.floor(minutes / 60);
-		if (hours < 24) return `${hours}h ago`;
-		const days = Math.floor(hours / 24);
-		return `${days}d ago`;
+	function viewJobResults(jobId: string) {
+		goto(`?tab=results&job=${jobId}`, { replaceState: false, keepFocus: true });
 	}
+
 
 	async function fetchData() {
 		try {
@@ -176,7 +169,7 @@
 			<div class="space-y-8">
 				<WorkerStatus {workers} />
 				<JobSubmitForm onSubmit={handleJobSubmit} />
-				<JobList {jobs} onCancel={handleJobCancel} onRefresh={fetchData} {API_BASE} />
+				<JobList {jobs} onCancel={handleJobCancel} onRefresh={fetchData} {API_BASE} onViewResults={viewJobResults} />
 			</div>
 		{:else if activeTab === 'results'}
 			<ResultsViewer {API_BASE} />
@@ -231,7 +224,7 @@
 												<div class="font-mono text-sm text-[var(--fg)]">{worker.id}</div>
 												<div class="mt-0.5 text-xs text-[var(--text-muted)]">
 													{worker.online
-														? `Last seen ${formatTimeSince(worker.last_heartbeat)}`
+														? `Last seen ${formatRelativeTime(worker.last_heartbeat)}`
 														: 'Offline'}
 												</div>
 											</div>

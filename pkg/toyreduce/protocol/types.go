@@ -41,6 +41,7 @@ type MapTask struct {
 // ReduceTask represents a partition to be reduced
 type ReduceTask struct {
 	ID          string     `json:"id"`
+	JobID       string     `json:"job_id"`
 	Partition   int        `json:"partition"`
 	Status      TaskStatus `json:"status"`
 	WorkerID    string     `json:"worker_id"`
@@ -117,6 +118,7 @@ type StatusResponse struct {
 // IntermediateData represents key-value pairs for a partition
 type IntermediateData struct {
 	TaskID    string               `json:"task_id"`
+	JobID     string               `json:"job_id"`
 	Partition int                  `json:"partition"`
 	Data      []toyreduce.KeyValue `json:"data"`
 }

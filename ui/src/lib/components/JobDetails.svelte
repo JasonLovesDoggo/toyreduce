@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext, onMount } from 'svelte';
 	import type { Context } from 'svelte-simple-modal';
+	import { formatDate } from '$lib/utils/date';
 
 	interface Props {
 		job: any;
@@ -70,9 +71,6 @@
 		}
 	}
 
-	function formatDate(date: string) {
-		return new Date(date).toLocaleString();
-	}
 
 	function formatDuration(seconds: number): string {
 		if (!seconds || seconds === 0) return '—';

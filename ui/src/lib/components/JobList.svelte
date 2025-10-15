@@ -2,6 +2,7 @@
 	import { getContext } from 'svelte';
 	import JobDetails from './JobDetails.svelte';
 	import type { Context } from 'svelte-simple-modal';
+	import { formatDate } from '$lib/utils/date';
 
 	const { open } = getContext<Context>('simple-modal');
 
@@ -10,9 +11,10 @@
 		API_BASE?: string;
 		onCancel: (jobId: string) => void;
 		onRefresh?: () => void;
+		onViewResults?: (jobId: string) => void;
 	}
 
-	let { jobs = [], API_BASE = '', onCancel }: Props = $props();
+	let { jobs = [], API_BASE = '', onCancel, onViewResults }: Props = $props();
 
 	function getStatusColor(status: string) {
 		switch (status) {
@@ -31,9 +33,6 @@
 		}
 	}
 
-	function formatDate(date: string) {
-		return new Date(date).toLocaleString();
-	}
 
 	function showDetails(job: any) {
 		// @ts-expect-error - svelte-simple-modal not yet compatible with Svelte 5 component types
@@ -63,14 +62,16 @@
 		<div class="space-y-3">
 			{#each jobs as job (job.id)}
 				<div
-					role="button"
-					tabindex="0"
-					class="cursor-pointer border border-[var(--border)] bg-[var(--surface)] p-4 transition-colors hover:border-[var(--accent)]"
-					onclick={() => showDetails(job)}
-					onkeydown={(e) => e.key === 'Enter' && showDetails(job)}
+					class="border border-[var(--border)] bg-[var(--surface)] p-4 transition-colors hover:border-[var(--accent)]"
 				>
 					<div class="flex items-start justify-between">
-						<div class="flex-1">
+						<div
+							role="button"
+							tabindex="0"
+							class="flex-1 cursor-pointer"
+							onclick={() => showDetails(job)}
+							onkeydown={(e) => e.key === 'Enter' && showDetails(job)}
+						>
 							<div class="mb-2 flex items-center gap-3">
 								<span class="font-mono text-xs text-[var(--text-muted)]">
 									{job.id.slice(0, 8)}
@@ -108,8 +109,21 @@
 							{/if}
 						</div>
 
-						<div class="text-right text-xs text-[var(--text-muted)]">
-							{formatDate(job.submitted_at)}
+						<div class="flex items-start gap-3">
+							{#if job.status === 'completed' && onViewResults}
+								<button
+									onclick={(e) => {
+										e.stopPropagation();
+										onViewResults?.(job.id);
+									}}
+									class="border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs tracking-wider text-[var(--fg)] uppercase transition-colors hover:border-[var(--accent)]"
+								>
+									View Results
+								</button>
+							{/if}
+							<div class="text-right text-xs text-[var(--text-muted)] pt-1">
+								{formatDate(job.submitted_at)}
+							</div>
 						</div>
 					</div>
 				</div>

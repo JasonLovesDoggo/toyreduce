@@ -58,9 +58,13 @@
 			const res = await fetch(`${API_BASE}/api/results`);
 			if (res.ok) {
 				results = await res.json();
+			} else {
+				console.error('Failed to fetch results:', res.statusText);
+				results = [];
 			}
 		} catch (err) {
 			console.error('Failed to fetch results:', err);
+			results = [];
 		} finally {
 			loading = false;
 		}

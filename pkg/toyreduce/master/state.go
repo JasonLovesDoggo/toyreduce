@@ -498,6 +498,7 @@ func (m *Master) transitionToReducePhase() {
 	for i := 0; i < job.ReduceTasks; i++ {
 		task := &protocol.ReduceTask{
 			ID:        uuid.New().String(),
+			JobID:     m.currentJobID,
 			Partition: i,
 			Status:    protocol.TaskStatusIdle,
 			Version:   uuid.New().String(),
@@ -517,6 +518,46 @@ func (m *Master) transitionToReducePhase() {
 	}
 }
 
+// isJobComplete checks if a job is complete based on its current state
+func (m *Master) isJobComplete(job *protocol.Job, state *JobState) bool {
+	if job.Status != protocol.JobStatusRunning {
+		return false
+	}
+
+	if len(state.reduceTasks) == 0 {
+		// Map-only job: complete when all map tasks are done
+		return state.mapTasksLeft == 0
+	} else {
+		// Map-reduce job: complete when all reduce tasks are done
+		return state.reduceTasksLeft == 0
+	}
+}
+
+// completeJob marks a job as completed and handles cleanup
+func (m *Master) completeJob(jobID string) {
+	job := m.jobs[jobID]
+	job.Status = protocol.JobStatusCompleted
+	job.CompletedAt = time.Now()
+	duration := job.CompletedAt.Sub(job.StartedAt)
+	log.Printf("[MASTER] Job %s completed in %v", jobID, duration)
+
+	// Fetch results from cache
+	go m.fetchJobResults(jobID)
+
+	// Clear current job and start next
+	m.currentJobID = ""
+
+	// Persist completion
+	if err := m.storage.SaveJob(job); err != nil {
+		log.Printf("[MASTER] Warning: Failed to persist completed job: %v", err)
+	}
+	if err := m.storage.SaveCurrentJobID(m.currentJobID); err != nil {
+		log.Printf("[MASTER] Warning: Failed to persist current job ID: %v", err)
+	}
+
+	m.startNextJobIfReady()
+}
+
 // checkJobCompletion checks if the current job is done and starts the next
 func (m *Master) checkJobCompletion() {
 	m.mu.Lock()
@@ -529,28 +570,8 @@ func (m *Master) checkJobCompletion() {
 	job := m.jobs[m.currentJobID]
 	state := m.jobStates[m.currentJobID]
 
-	if job.Status == protocol.JobStatusRunning && state.reduceTasksLeft == 0 && len(state.reduceTasks) > 0 {
-		job.Status = protocol.JobStatusCompleted
-		job.CompletedAt = time.Now()
-		duration := job.CompletedAt.Sub(job.StartedAt)
-		log.Printf("[MASTER] Job %s completed in %v", m.currentJobID, duration)
-
-		// Fetch results from cache
-		jobID := m.currentJobID
-		go m.fetchJobResults(jobID)
-
-		// Clear current job and start next
-		m.currentJobID = ""
-
-		// Persist completion
-		if err := m.storage.SaveJob(job); err != nil {
-			log.Printf("[MASTER] Warning: Failed to persist completed job: %v", err)
-		}
-		if err := m.storage.SaveCurrentJobID(m.currentJobID); err != nil {
-			log.Printf("[MASTER] Warning: Failed to persist current job ID: %v", err)
-		}
-
-		m.startNextJobIfReady()
+	if m.isJobComplete(job, state) {
+		m.completeJob(m.currentJobID)
 	}
 }
 
@@ -561,8 +582,8 @@ func (m *Master) fetchJobResults(jobID string) {
 		return
 	}
 
-	// Fetch all results from cache
-	results, err := m.getResultsFromCache()
+	// Fetch job-specific results from cache
+	results, err := m.getJobResultsFromCache(jobID)
 	if err != nil {
 		log.Printf("[MASTER] Failed to fetch results for job %s: %v", jobID, err)
 		return
@@ -581,13 +602,14 @@ func (m *Master) fetchJobResults(jobID string) {
 	}
 }
 
-// getResultsFromCache fetches all results from the cache server
-func (m *Master) getResultsFromCache() ([]toyreduce.KeyValue, error) {
+// getJobResultsFromCache fetches results for a specific job from the cache server
+func (m *Master) getJobResultsFromCache(jobID string) ([]toyreduce.KeyValue, error) {
 	if m.cacheURL == "" {
 		return nil, fmt.Errorf("cache URL not configured")
 	}
 
-	resp, err := http.Get(m.cacheURL + "/results")
+	url := fmt.Sprintf("%s/results/job/%s", m.cacheURL, jobID)
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch results: %w", err)
 	}

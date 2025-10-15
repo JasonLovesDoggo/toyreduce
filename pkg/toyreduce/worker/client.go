@@ -194,9 +194,10 @@ func (c *Client) GetReduceInput(partition int) ([]toyreduce.KeyValue, error) {
 }
 
 // StoreReduceOutput sends reduce output to cache
-func (c *Client) StoreReduceOutput(taskID string, data []toyreduce.KeyValue) error {
+func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyValue) error {
 	req := protocol.IntermediateData{
 		TaskID: taskID,
+		JobID:  jobID,
 		Data:   data,
 	}
 

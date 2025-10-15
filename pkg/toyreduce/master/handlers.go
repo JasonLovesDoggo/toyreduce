@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"pkg.jsn.cam/toyreduce/pkg/toyreduce/httpx"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
 )
 
@@ -56,32 +57,29 @@ func NewServer(cfg Config) (*Server, error) {
 
 func (s *Server) setupRoutes() {
 	// Worker APIs
-	s.mux.HandleFunc("POST /api/workers/register", s.handleWorkerRegistration)
-	s.mux.HandleFunc("GET /api/workers", s.handleWorkerList)
-	s.mux.HandleFunc("GET /api/tasks/next", s.handleGetNextTask)
-	s.mux.HandleFunc("POST /api/tasks/{taskID}/complete", s.handleTaskCompletion)
-	s.mux.HandleFunc("POST /api/workers/{workerID}/heartbeat", s.handleHeartbeat)
+	s.mux.HandleFunc("POST /api/workers/register", httpx.Wrap(s.handleWorkerRegistration))
+	s.mux.HandleFunc("GET /api/workers", httpx.Wrap(s.handleWorkerList))
+	s.mux.HandleFunc("GET /api/tasks/next", httpx.Wrap(s.handleGetNextTask))
+	s.mux.HandleFunc("POST /api/tasks/{taskID}/complete", httpx.Wrap(s.handleTaskCompletion))
+	s.mux.HandleFunc("POST /api/workers/{workerID}/heartbeat", httpx.Wrap(s.handleHeartbeat))
 
 	// Job APIs
-	s.mux.HandleFunc("POST /api/jobs", s.handleJobSubmit)
-	s.mux.HandleFunc("GET /api/jobs", s.handleJobList)
-	s.mux.HandleFunc("GET /api/jobs/{jobID}", s.handleJobStatus)
-	s.mux.HandleFunc("GET /api/jobs/{jobID}/results", s.handleJobResults)
-	s.mux.HandleFunc("POST /api/jobs/{jobID}/cancel", s.handleJobCancel)
-
-	// Results API
-	s.mux.HandleFunc("GET /api/results", s.handleAllResults)
+	s.mux.HandleFunc("POST /api/jobs", httpx.Wrap(s.handleJobSubmit))
+	s.mux.HandleFunc("GET /api/jobs", httpx.Wrap(s.handleJobList))
+	s.mux.HandleFunc("GET /api/jobs/{jobID}", httpx.Wrap(s.handleJobStatus))
+	s.mux.HandleFunc("GET /api/jobs/{jobID}/results", httpx.Wrap(s.handleJobResults))
+	s.mux.HandleFunc("POST /api/jobs/{jobID}/cancel", httpx.Wrap(s.handleJobCancel))
 
 	// Config and Status
-	s.mux.HandleFunc("GET /api/config", s.handleConfig)
-	s.mux.HandleFunc("GET /api/status", s.handleStatus)
-	s.mux.HandleFunc("GET /health", s.handleHealth)
+	s.mux.HandleFunc("GET /api/config", httpx.Wrap(s.handleConfig))
+	s.mux.HandleFunc("GET /api/status", httpx.Wrap(s.handleStatus))
+	s.mux.HandleFunc("GET /health", httpx.Wrap(s.handleHealth))
 
 	// Cache proxy endpoints
-	s.mux.HandleFunc("GET /api/cache/stats", s.handleCacheStats)
-	s.mux.HandleFunc("POST /api/cache/reset", s.handleCacheReset)
-	s.mux.HandleFunc("POST /api/cache/compact", s.handleCacheCompact)
-	s.mux.HandleFunc("GET /api/cache/health", s.handleCacheHealthCheck)
+	s.mux.HandleFunc("GET /api/cache/stats", httpx.Wrap(s.handleCacheStats))
+	s.mux.HandleFunc("POST /api/cache/reset", httpx.Wrap(s.handleCacheReset))
+	s.mux.HandleFunc("POST /api/cache/compact", httpx.Wrap(s.handleCacheCompact))
+	s.mux.HandleFunc("GET /api/cache/health", httpx.Wrap(s.handleCacheHealthCheck))
 
 	// UI - Serve the embedded Svelte app from root
 	staticFS, err := fs.Sub(uiFS, "static")
@@ -92,11 +90,11 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request) error {
 	var req protocol.WorkerRegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return nil
 	}
 
 	// Validate and register worker
@@ -106,10 +104,8 @@ func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request
 			Success:  false,
 			Error:    err.Error(),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK) // Still 200, but Success=false
-		json.NewEncoder(w).Encode(resp)
-		return
+		httpx.JSON(w, http.StatusOK, resp) // Still 200, but Success=false
+		return nil
 	}
 
 	resp := protocol.WorkerRegistrationResponse{
@@ -118,36 +114,35 @@ func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request
 		Success:  true,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	httpx.JSON(w, http.StatusOK, resp)
+	return nil
 }
 
-func (s *Server) handleGetNextTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetNextTask(w http.ResponseWriter, r *http.Request) error {
 	workerID := r.URL.Query().Get("workerID")
 	if workerID == "" {
-		http.Error(w, "workerID required", http.StatusBadRequest)
-		return
+		httpx.Error(w, http.StatusBadRequest, "workerID required")
+		return nil
 	}
 
 	task := s.master.GetNextTask(workerID)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(task)
+	httpx.JSON(w, http.StatusOK, task)
+	return nil
 }
 
-func (s *Server) handleTaskCompletion(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTaskCompletion(w http.ResponseWriter, r *http.Request) error {
 	taskID := r.PathValue("taskID")
 	workerID := r.URL.Query().Get("workerID")
 
 	if workerID == "" {
-		http.Error(w, "workerID required", http.StatusBadRequest)
-		return
+		httpx.Error(w, http.StatusBadRequest, "workerID required")
+		return nil
 	}
 
 	var req protocol.TaskCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return nil
 	}
 
 	// Determine task type by checking both task lists
@@ -170,180 +165,169 @@ func (s *Server) handleTaskCompletion(w http.ResponseWriter, r *http.Request) {
 		Message:      message,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	httpx.JSON(w, http.StatusOK, resp)
+	return nil
 }
 
-func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) error {
 	workerID := r.PathValue("workerID")
 
 	var req protocol.HeartbeatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return nil
 	}
 
 	ok := s.master.UpdateHeartbeat(workerID)
 
 	resp := protocol.HeartbeatResponse{OK: ok}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	httpx.JSON(w, http.StatusOK, resp)
+	return nil
 }
 
-func (s *Server) handleWorkerList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleWorkerList(w http.ResponseWriter, r *http.Request) error {
 	workers := s.master.ListWorkers()
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{
 		"workers": workers,
 	})
+	return nil
 }
 
-func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) error {
 	config := s.master.GetConfig()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(config)
+	httpx.JSON(w, http.StatusOK, config)
+	return nil
 }
 
-func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) error {
 	status := s.master.GetStatus()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	httpx.JSON(w, http.StatusOK, status)
+	return nil
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(protocol.HealthResponse{Status: "ok"})
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
+	httpx.JSON(w, http.StatusOK, protocol.HealthResponse{Status: "ok"})
+	return nil
 }
 
 // Cache proxy handlers
-func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) error {
 	cacheURL := s.master.cacheURL
 	if cacheURL == "" {
-		http.Error(w, "cache not configured", http.StatusServiceUnavailable)
-		return
+		httpx.Error(w, http.StatusServiceUnavailable, "cache not configured")
+		return nil
 	}
 
 	resp, err := http.Get(cacheURL + "/stats")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("cache unreachable: %v", err), http.StatusServiceUnavailable)
-		return
+		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("cache unreachable: %v", err))
+		return nil
 	}
 	defer resp.Body.Close()
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
 
 	// Copy response
 	var stats map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return nil
 	}
-	json.NewEncoder(w).Encode(stats)
+	httpx.JSON(w, resp.StatusCode, stats)
+	return nil
 }
 
-func (s *Server) handleCacheReset(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCacheReset(w http.ResponseWriter, r *http.Request) error {
 	cacheURL := s.master.cacheURL
 	if cacheURL == "" {
-		http.Error(w, "cache not configured", http.StatusServiceUnavailable)
-		return
+		httpx.Error(w, http.StatusServiceUnavailable, "cache not configured")
+		return nil
 	}
 
 	req, err := http.NewRequest("POST", cacheURL+"/reset", nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return nil
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("cache unreachable: %v", err), http.StatusServiceUnavailable)
-		return
+		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("cache unreachable: %v", err))
+		return nil
 	}
 	defer resp.Body.Close()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return nil
 	}
-	json.NewEncoder(w).Encode(result)
+	httpx.JSON(w, resp.StatusCode, result)
+	return nil
 }
 
-func (s *Server) handleCacheCompact(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCacheCompact(w http.ResponseWriter, r *http.Request) error {
 	cacheURL := s.master.cacheURL
 	if cacheURL == "" {
-		http.Error(w, "cache not configured", http.StatusServiceUnavailable)
-		return
+		httpx.Error(w, http.StatusServiceUnavailable, "cache not configured")
+		return nil
 	}
 
 	req, err := http.NewRequest("POST", cacheURL+"/compact", nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return nil
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("cache unreachable: %v", err), http.StatusServiceUnavailable)
-		return
+		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("cache unreachable: %v", err))
+		return nil
 	}
 	defer resp.Body.Close()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return nil
 	}
-	json.NewEncoder(w).Encode(result)
+	httpx.JSON(w, resp.StatusCode, result)
+	return nil
 }
 
-func (s *Server) handleCacheHealthCheck(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCacheHealthCheck(w http.ResponseWriter, r *http.Request) error {
 	cacheURL := s.master.cacheURL
 	if cacheURL == "" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		httpx.JSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "unconfigured",
 			"healthy": false,
 		})
-		return
+		return nil
 	}
 
 	err := s.checkCacheHealth(cacheURL)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		httpx.JSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "unhealthy",
 			"healthy": false,
 			"error":   err.Error(),
 		})
-		return
+		return nil
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	httpx.JSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "healthy",
 		"healthy": true,
 	})
+	return nil
 }
 
-func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) error {
 	var req protocol.JobSubmitRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return nil
 	}
 
 	jobID, err := s.master.SubmitJob(req)
@@ -352,10 +336,8 @@ func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
 			Status:  "error",
 			Message: err.Error(),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
-		return
+		httpx.JSON(w, http.StatusBadRequest, resp)
+		return nil
 	}
 
 	resp := protocol.JobSubmitResponse{
@@ -363,12 +345,11 @@ func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
 		Status: "queued",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	httpx.JSON(w, http.StatusCreated, resp)
+	return nil
 }
 
-func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) error {
 	jobs := s.master.ListJobs()
 
 	// Compute durations for all jobs
@@ -380,51 +361,40 @@ func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) {
 		Jobs: jobs,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	httpx.JSON(w, http.StatusOK, resp)
+	return nil
 }
 
-func (s *Server) handleJobStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleJobStatus(w http.ResponseWriter, r *http.Request) error {
 	jobID := r.PathValue("jobID")
 
 	job := s.master.GetJob(jobID)
 	if job == nil {
-		http.Error(w, "job not found", http.StatusNotFound)
-		return
+		httpx.Error(w, http.StatusNotFound, "job not found")
+		return nil
 	}
 
 	// Compute durations
 	job.ComputeDurations()
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(job)
+	httpx.JSON(w, http.StatusOK, job)
+	return nil
 }
 
-func (s *Server) handleJobResults(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleJobResults(w http.ResponseWriter, r *http.Request) error {
 	jobID := r.PathValue("jobID")
 
 	results, err := s.master.GetJobResults(jobID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return nil
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	httpx.JSON(w, http.StatusOK, results)
+	return nil
 }
 
-func (s *Server) handleAllResults(w http.ResponseWriter, r *http.Request) {
-	results, err := s.master.getResultsFromCache()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
-}
-
-func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) error {
 	jobID := r.PathValue("jobID")
 
 	err := s.master.CancelJob(jobID)
@@ -433,10 +403,8 @@ func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) {
 			Success: false,
 			Message: err.Error(),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(resp)
-		return
+		httpx.JSON(w, http.StatusBadRequest, resp)
+		return nil
 	}
 
 	resp := protocol.JobCancelResponse{
@@ -444,8 +412,8 @@ func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) {
 		Message: "job cancelled",
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	httpx.JSON(w, http.StatusOK, resp)
+	return nil
 }
 
 // Start starts the HTTP server

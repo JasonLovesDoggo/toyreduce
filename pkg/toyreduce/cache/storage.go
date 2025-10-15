@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -110,9 +111,9 @@ func (s *Storage) GetReduceInput(partition int) []toyreduce.KeyValue {
 	return result
 }
 
-// StoreReduceOutput stores final reduce results
-func (s *Storage) StoreReduceOutput(taskID string, data []toyreduce.KeyValue) error {
-	key := []byte(taskID)
+// StoreReduceOutput stores final reduce results with job ID
+func (s *Storage) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyValue) error {
+	key := []byte(fmt.Sprintf("job_%s_%s", jobID, taskID))
 
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(resultsBucket)
@@ -145,20 +146,24 @@ func (s *Storage) GetReduceOutput(taskID string) ([]toyreduce.KeyValue, bool) {
 	return result, found
 }
 
-// GetAllReduceOutputs returns all final results
-func (s *Storage) GetAllReduceOutputs() []toyreduce.KeyValue {
+// GetJobResults returns all results for a specific job
+func (s *Storage) GetJobResults(jobID string) []toyreduce.KeyValue {
 	var all []toyreduce.KeyValue
+	prefix := []byte(fmt.Sprintf("job_%s_", jobID))
 
 	s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(resultsBucket)
-		return b.ForEach(func(k, v []byte) error {
+		c := b.Cursor()
+
+		// Iterate over keys with the job prefix
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 			var data []toyreduce.KeyValue
 			if err := json.Unmarshal(v, &data); err != nil {
-				return err
+				continue
 			}
 			all = append(all, data...)
-			return nil
-		})
+		}
+		return nil
 	})
 
 	return all

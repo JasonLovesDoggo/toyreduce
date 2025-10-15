@@ -82,13 +82,15 @@ func (m *Master) restore() error {
 	}
 	log.Printf("[MASTER] Restored %d job states", len(m.jobStates))
 
-	// Load queue
-	queue, err := m.storage.LoadQueue()
-	if err != nil {
-		return err
+	// Rebuild queue from job statuses (source of truth)
+	// Don't load from storage - it may be stale if queue wasn't persisted on every modification
+	m.jobQueue = []string{}
+	for jobID, job := range m.jobs {
+		if job.Status == protocol.JobStatusQueued {
+			m.jobQueue = append(m.jobQueue, jobID)
+		}
 	}
-	m.jobQueue = queue
-	log.Printf("[MASTER] Restored queue with %d jobs", len(queue))
+	log.Printf("[MASTER] Rebuilt queue with %d queued jobs", len(m.jobQueue))
 
 	// Load current job ID
 	currentJobID, err := m.storage.LoadCurrentJobID()

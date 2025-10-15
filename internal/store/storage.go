@@ -2,14 +2,13 @@ package store
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync/atomic"
 
-	"go.etcd.io/bbolt"
+	pkgstorage "pkg.jsn.cam/toyreduce/pkg/storage"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 )
 
@@ -19,14 +18,14 @@ var (
 	resultsBucket      = []byte("results")
 )
 
-// Storage manages intermediate and final K-V data using bbolt
+// Storage manages intermediate and final K-V data
 type Storage struct {
-	db      *bbolt.DB
+	backend pkgstorage.Backend
 	path    string
 	counter atomic.Uint64 // Counter for append-only keys
 }
 
-// NewStorage creates a new bbolt-backed storage instance
+// NewStorage creates a new storage instance
 func NewStorage(dbPath string) (*Storage, error) {
 	// Ensure directory exists
 	dir := filepath.Dir(dbPath)
@@ -34,49 +33,45 @@ func NewStorage(dbPath string) (*Storage, error) {
 		return nil, fmt.Errorf("create db directory: %w", err)
 	}
 
-	// Open database
-	db, err := bbolt.Open(dbPath, 0600, nil)
+	// Create backend
+	backend, err := pkgstorage.NewBboltBackend(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("open bbolt db: %w", err)
+		return nil, fmt.Errorf("open backend: %w", err)
 	}
 
 	// Initialize buckets
-	err = db.Update(func(tx *bbolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists(intermediateBucket); err != nil {
-			return err
+	for _, bucket := range [][]byte{intermediateBucket, resultsBucket} {
+		if err := backend.CreateBucket(bucket); err != nil {
+			backend.Close()
+			return nil, fmt.Errorf("create buckets: %w", err)
 		}
-		if _, err := tx.CreateBucketIfNotExists(resultsBucket); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		db.Close()
-		return nil, fmt.Errorf("create buckets: %w", err)
 	}
 
 	return &Storage{
-		db:   db,
-		path: dbPath,
+		backend: backend,
+		path:    dbPath,
 	}, nil
 }
 
 // Close closes the database
 func (s *Storage) Close() error {
-	return s.db.Close()
+	return s.backend.Close()
 }
 
 // StoreMapOutput stores intermediate data for a specific partition
 func (s *Storage) StoreMapOutput(partition int, data []toyreduce.KeyValue) error {
 	key := []byte(fmt.Sprintf("partition_%d", partition))
 
-	return s.db.Update(func(tx *bbolt.Tx) error {
+	return s.backend.Update(func(tx pkgstorage.Transaction) error {
 		b := tx.Bucket(intermediateBucket)
+		if b == nil {
+			return fmt.Errorf("bucket not found: %s", intermediateBucket)
+		}
 
 		// Get existing data
 		var existing []toyreduce.KeyValue
 		if v := b.Get(key); v != nil {
-			if err := json.Unmarshal(v, &existing); err != nil {
+			if err := pkgstorage.DecodeJSON(v, &existing); err != nil {
 				return err
 			}
 		}
@@ -85,7 +80,7 @@ func (s *Storage) StoreMapOutput(partition int, data []toyreduce.KeyValue) error
 		existing = append(existing, data...)
 
 		// Store back
-		encoded, err := json.Marshal(existing)
+		encoded, err := pkgstorage.EncodeJSON(existing)
 		if err != nil {
 			return err
 		}
@@ -100,10 +95,13 @@ func (s *Storage) GetReduceInput(partition int) []toyreduce.KeyValue {
 
 	var result []toyreduce.KeyValue
 
-	s.db.View(func(tx *bbolt.Tx) error {
+	s.backend.View(func(tx pkgstorage.Transaction) error {
 		b := tx.Bucket(intermediateBucket)
+		if b == nil {
+			return nil
+		}
 		if v := b.Get(key); v != nil {
-			json.Unmarshal(v, &result)
+			pkgstorage.DecodeJSON(v, &result)
 		}
 		return nil
 	})
@@ -115,10 +113,13 @@ func (s *Storage) GetReduceInput(partition int) []toyreduce.KeyValue {
 func (s *Storage) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyValue) error {
 	key := []byte(fmt.Sprintf("job_%s_%s", jobID, taskID))
 
-	return s.db.Update(func(tx *bbolt.Tx) error {
+	return s.backend.Update(func(tx pkgstorage.Transaction) error {
 		b := tx.Bucket(resultsBucket)
+		if b == nil {
+			return fmt.Errorf("bucket not found: %s", resultsBucket)
+		}
 
-		encoded, err := json.Marshal(data)
+		encoded, err := pkgstorage.EncodeJSON(data)
 		if err != nil {
 			return err
 		}
@@ -134,10 +135,13 @@ func (s *Storage) GetReduceOutput(taskID string) ([]toyreduce.KeyValue, bool) {
 	var result []toyreduce.KeyValue
 	var found bool
 
-	s.db.View(func(tx *bbolt.Tx) error {
+	s.backend.View(func(tx pkgstorage.Transaction) error {
 		b := tx.Bucket(resultsBucket)
+		if b == nil {
+			return nil
+		}
 		if v := b.Get(key); v != nil {
-			json.Unmarshal(v, &result)
+			pkgstorage.DecodeJSON(v, &result)
 			found = true
 		}
 		return nil
@@ -151,18 +155,23 @@ func (s *Storage) GetJobResults(jobID string) []toyreduce.KeyValue {
 	var all []toyreduce.KeyValue
 	prefix := []byte(fmt.Sprintf("job_%s_", jobID))
 
-	s.db.View(func(tx *bbolt.Tx) error {
+	s.backend.View(func(tx pkgstorage.Transaction) error {
 		b := tx.Bucket(resultsBucket)
-		c := b.Cursor()
-
-		// Iterate over keys with the job prefix
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			var data []toyreduce.KeyValue
-			if err := json.Unmarshal(v, &data); err != nil {
-				continue
-			}
-			all = append(all, data...)
+		if b == nil {
+			return nil
 		}
+
+		// Iterate over all keys and filter by prefix
+		b.ForEach(func(k, v []byte) error {
+			if bytes.HasPrefix(k, prefix) {
+				var data []toyreduce.KeyValue
+				if err := pkgstorage.DecodeJSON(v, &data); err != nil {
+					return nil // Skip corrupted data
+				}
+				all = append(all, data...)
+			}
+			return nil
+		})
 		return nil
 	})
 
@@ -171,19 +180,19 @@ func (s *Storage) GetJobResults(jobID string) []toyreduce.KeyValue {
 
 // Reset clears all data (for reruns)
 func (s *Storage) Reset() error {
-	return s.db.Update(func(tx *bbolt.Tx) error {
+	return s.backend.Update(func(tx pkgstorage.Transaction) error {
 		// Delete and recreate buckets
-		if err := tx.DeleteBucket(intermediateBucket); err != nil && err != bbolt.ErrBucketNotFound {
+		if err := tx.DeleteBucket(intermediateBucket); err != nil {
 			return err
 		}
-		if err := tx.DeleteBucket(resultsBucket); err != nil && err != bbolt.ErrBucketNotFound {
+		if err := tx.DeleteBucket(resultsBucket); err != nil {
 			return err
 		}
 
-		if _, err := tx.CreateBucket(intermediateBucket); err != nil {
+		if err := tx.CreateBucket(intermediateBucket); err != nil {
 			return err
 		}
-		if _, err := tx.CreateBucket(resultsBucket); err != nil {
+		if err := tx.CreateBucket(resultsBucket); err != nil {
 			return err
 		}
 
@@ -195,34 +204,38 @@ func (s *Storage) Reset() error {
 func (s *Storage) Stats() map[string]interface{} {
 	stats := make(map[string]interface{})
 
-	s.db.View(func(tx *bbolt.Tx) error {
+	s.backend.View(func(tx pkgstorage.Transaction) error {
 		// Count intermediate partitions and KVs
 		intermediatePartitions := 0
 		intermediateKVs := 0
 
 		b := tx.Bucket(intermediateBucket)
-		b.ForEach(func(k, v []byte) error {
-			intermediatePartitions++
-			var data []toyreduce.KeyValue
-			if err := json.Unmarshal(v, &data); err == nil {
-				intermediateKVs += len(data)
-			}
-			return nil
-		})
+		if b != nil {
+			b.ForEach(func(k, v []byte) error {
+				intermediatePartitions++
+				var data []toyreduce.KeyValue
+				if err := pkgstorage.DecodeJSON(v, &data); err == nil {
+					intermediateKVs += len(data)
+				}
+				return nil
+			})
+		}
 
 		// Count reduce tasks and result KVs
 		reduceTasks := 0
 		resultKVs := 0
 
 		b = tx.Bucket(resultsBucket)
-		b.ForEach(func(k, v []byte) error {
-			reduceTasks++
-			var data []toyreduce.KeyValue
-			if err := json.Unmarshal(v, &data); err == nil {
-				resultKVs += len(data)
-			}
-			return nil
-		})
+		if b != nil {
+			b.ForEach(func(k, v []byte) error {
+				reduceTasks++
+				var data []toyreduce.KeyValue
+				if err := pkgstorage.DecodeJSON(v, &data); err == nil {
+					resultKVs += len(data)
+				}
+				return nil
+			})
+		}
 
 		stats["intermediate_partitions"] = intermediatePartitions
 		stats["intermediate_kvs"] = intermediateKVs
@@ -250,20 +263,29 @@ func (s *Storage) Compact() error {
 	// Create a temporary database
 	tempPath := s.path + ".compact"
 
-	tempDB, err := bbolt.Open(tempPath, 0600, nil)
+	tempBackend, err := pkgstorage.NewBboltBackend(tempPath)
 	if err != nil {
 		return err
 	}
 
+	// Create buckets in temp backend
+	for _, bucket := range [][]byte{intermediateBucket, resultsBucket} {
+		if err := tempBackend.CreateBucket(bucket); err != nil {
+			tempBackend.Close()
+			os.Remove(tempPath)
+			return err
+		}
+	}
+
 	// Copy data to temp database
-	err = s.db.View(func(srcTx *bbolt.Tx) error {
-		return tempDB.Update(func(dstTx *bbolt.Tx) error {
+	err = s.backend.View(func(srcTx pkgstorage.Transaction) error {
+		return tempBackend.Update(func(dstTx pkgstorage.Transaction) error {
 			// Copy intermediate bucket
 			srcBucket := srcTx.Bucket(intermediateBucket)
 			if srcBucket != nil {
-				dstBucket, err := dstTx.CreateBucket(intermediateBucket)
-				if err != nil {
-					return err
+				dstBucket := dstTx.Bucket(intermediateBucket)
+				if dstBucket == nil {
+					return fmt.Errorf("destination bucket not found: %s", intermediateBucket)
 				}
 				if err := srcBucket.ForEach(func(k, v []byte) error {
 					return dstBucket.Put(k, v)
@@ -275,9 +297,9 @@ func (s *Storage) Compact() error {
 			// Copy results bucket
 			srcBucket = srcTx.Bucket(resultsBucket)
 			if srcBucket != nil {
-				dstBucket, err := dstTx.CreateBucket(resultsBucket)
-				if err != nil {
-					return err
+				dstBucket := dstTx.Bucket(resultsBucket)
+				if dstBucket == nil {
+					return fmt.Errorf("destination bucket not found: %s", resultsBucket)
 				}
 				if err := srcBucket.ForEach(func(k, v []byte) error {
 					return dstBucket.Put(k, v)
@@ -291,27 +313,27 @@ func (s *Storage) Compact() error {
 	})
 
 	if err != nil {
-		tempDB.Close()
+		tempBackend.Close()
 		os.Remove(tempPath)
 		return err
 	}
 
-	tempDB.Close()
+	tempBackend.Close()
 
-	// Close original database
-	s.db.Close()
+	// Close original backend
+	s.backend.Close()
 
 	// Replace with compacted version
 	if err := os.Rename(tempPath, s.path); err != nil {
 		return err
 	}
 
-	// Reopen database
-	db, err := bbolt.Open(s.path, 0600, nil)
+	// Reopen backend
+	backend, err := pkgstorage.NewBboltBackend(s.path)
 	if err != nil {
 		return err
 	}
-	s.db = db
+	s.backend = backend
 
 	return nil
 }

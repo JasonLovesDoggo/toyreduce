@@ -6,6 +6,12 @@ It implements the core ideas from Google's MapReduce paper with some aspects of 
 
 Workers store intermediate data locally and shuffle via P2P, eliminating the centralized storage bottleneck. Includes a real-time web UI for job monitoring and submission.
 
+
+
+https://github.com/user-attachments/assets/c1b89e8c-bd8b-4c79-9994-19b00951a3a2
+
+
+
 ## Quick Start
 
 ```bash

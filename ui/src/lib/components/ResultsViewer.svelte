@@ -198,7 +198,9 @@
 	</div>
 
 	{#if loading}
-		<div class="border border-[var(--border)] bg-[var(--surface)] p-16 text-center min-h-[400px] flex items-center justify-center">
+		<div
+			class="flex min-h-[400px] items-center justify-center border border-[var(--border)] bg-[var(--surface)] p-16 text-center"
+		>
 			<div class="text-center">
 				<div
 					class="inline-block h-8 w-8 animate-spin border-2 border-[var(--border)] border-t-[var(--accent)]"
@@ -207,7 +209,9 @@
 			</div>
 		</div>
 	{:else if results.length === 0}
-		<div class="border border-[var(--border)] bg-[var(--surface)] p-16 text-center min-h-[400px] flex items-center justify-center">
+		<div
+			class="flex min-h-[400px] items-center justify-center border border-[var(--border)] bg-[var(--surface)] p-16 text-center"
+		>
 			<div class="text-center">
 				<p class="text-sm text-[var(--text-muted)]">No results available yet.</p>
 				<p class="mt-2 text-xs text-[var(--text-muted)]">
@@ -217,7 +221,9 @@
 		</div>
 	{:else}
 		<!-- Stats -->
-		<div class="border border-[var(--border)] bg-[var(--surface)] p-6 transition-opacity duration-200">
+		<div
+			class="border border-[var(--border)] bg-[var(--surface)] p-6 transition-opacity duration-200"
+		>
 			<div class="grid grid-cols-3 gap-8">
 				<div>
 					<div class="mb-2 text-xs tracking-wider text-[var(--text-muted)] uppercase">

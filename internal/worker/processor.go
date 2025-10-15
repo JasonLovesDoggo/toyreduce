@@ -43,7 +43,7 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 	// Partition the output
 	partitioned := PartitionMapOutput(emitted, task.NumPartitions)
 
-	// Send each partition to cache
+	// Send each partition to store
 	for partition, kvs := range partitioned {
 		if err := p.client.StoreMapOutput(task.ID, partition, kvs); err != nil {
 			return fmt.Errorf("store partition %d error: %w", partition, err)
@@ -65,7 +65,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 	log.Printf("[WORKER:%s] Processing reduce task %s (partition %d)",
 		workerID, task.ID, task.Partition)
 
-	// Fetch intermediate data from cache
+	// Fetch intermediate data from store
 	intermediate, err := p.client.GetReduceInput(task.Partition)
 	if err != nil {
 		return fmt.Errorf("get reduce input error: %w", err)
@@ -93,7 +93,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 
 	log.Printf("[WORKER:%s] Reduce produced %d results", workerID, len(results))
 
-	// Store results in cache
+	// Store results in store
 	if err := p.client.StoreReduceOutput(task.ID, task.JobID, results); err != nil {
 		return fmt.Errorf("store reduce output error: %w", err)
 	}

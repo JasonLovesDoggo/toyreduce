@@ -68,7 +68,7 @@ type WorkerRegistrationRequest struct {
 // WorkerRegistrationResponse is returned to workers upon registration
 type WorkerRegistrationResponse struct {
 	WorkerID string `json:"worker_id"`
-	CacheURL string `json:"cache_url"`
+	StoreURL string `json:"store_url"`
 	Success  bool   `json:"success"`
 	Error    string `json:"error,omitempty"`
 }

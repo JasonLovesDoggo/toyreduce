@@ -71,7 +71,6 @@
 		}
 	}
 
-
 	function formatDuration(seconds: number): string {
 		if (!seconds || seconds === 0) return '—';
 
@@ -191,7 +190,7 @@
 							<div class="mt-2 flex justify-between">
 								<span class="text-xs text-[var(--text-muted)]">Throughput</span>
 								<span class="font-mono text-sm font-semibold text-[var(--fg)]"
-									>{ formatTaskThroughput(currentJob.map_tasks_done, currentJob.map_phase_duration)} tasks/s</span
+									>{formatTaskThroughput(currentJob.map_tasks_done, currentJob.map_phase_duration)} tasks/s</span
 								>
 							</div>
 						</div>

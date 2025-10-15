@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"pkg.jsn.cam/toyreduce/internal/cache"
 	master2 "pkg.jsn.cam/toyreduce/internal/master"
+	"pkg.jsn.cam/toyreduce/internal/store"
 	"pkg.jsn.cam/toyreduce/internal/worker"
 	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
@@ -22,8 +22,8 @@ func main() {
 	command := os.Args[1]
 
 	switch command {
-	case "cache":
-		runCacheMode()
+	case "store":
+		runStoreMode()
 	case "master":
 		runMasterMode()
 	case "worker":
@@ -49,38 +49,38 @@ func main() {
 	}
 }
 
-func runCacheMode() {
-	fs := flag.NewFlagSet("cache", flag.ExitOnError)
-	port := fs.Int("port", 8081, "Port for cache server")
-	dbPath := fs.String("db-path", "var/cache.db", "Path to bbolt database file")
+func runStoreMode() {
+	fs := flag.NewFlagSet("store", flag.ExitOnError)
+	port := fs.Int("port", 8081, "Port for store server")
+	dbPath := fs.String("db-path", "var/store.db", "Path to bbolt database file")
 
 	fs.Parse(os.Args[2:])
 
-	log.Printf("Starting ToyReduce cache node on port %d", *port)
+	log.Printf("Starting ToyReduce store node on port %d", *port)
 	log.Printf("  Database: %s", *dbPath)
 
-	server, err := cache.NewServer(*dbPath)
+	server, err := store.NewServer(*dbPath)
 	if err != nil {
-		log.Fatalf("Failed to create cache server: %v", err)
+		log.Fatalf("Failed to create store server: %v", err)
 	}
 	defer server.Close()
 
 	if err := server.Start(*port); err != nil {
-		log.Fatalf("Cache server error: %v", err)
+		log.Fatalf("Store server error: %v", err)
 	}
 }
 
 func runMasterMode() {
 	fs := flag.NewFlagSet("master", flag.ExitOnError)
 	port := fs.Int("port", 8080, "Port for master server")
-	cacheURL := fs.String("cache-url", "http://localhost:8081", "URL of cache server")
+	storeURL := fs.String("store-url", "http://localhost:8081", "URL of store server")
 	heartbeatTimeout := fs.Duration("heartbeat-timeout", 30*time.Second, "Worker heartbeat timeout")
 	dbPath := fs.String("db-path", "var/master.db", "Path to bbolt database for persistence (empty = no persistence)")
 
 	fs.Parse(os.Args[2:])
 
 	log.Printf("Starting ToyReduce master node on port %d", *port)
-	log.Printf("  Cache URL: %s", *cacheURL)
+	log.Printf("  Store URL: %s", *storeURL)
 	log.Printf("  Heartbeat timeout: %v", *heartbeatTimeout)
 	if *dbPath != "" {
 		log.Printf("  Persistence: enabled (%s)", *dbPath)
@@ -91,7 +91,7 @@ func runMasterMode() {
 
 	cfg := master2.Config{
 		Port:             *port,
-		CacheURL:         *cacheURL,
+		StoreURL:         *storeURL,
 		HeartbeatTimeout: *heartbeatTimeout,
 		DBPath:           *dbPath,
 	}
@@ -220,7 +220,7 @@ Usage:
   toyreduce <command> [options]
 
 Server Commands (long-running processes):
-  cache             Start a cache node
+  store             Start a store node
   master            Start a master node
   worker            Start a worker node
 
@@ -235,13 +235,13 @@ Utility Commands:
   list-executors    List available executors
   help              Show this help message
 
-Cache Node Options:
-  --port            Port for cache server (default: 8081)
-  --db-path         Path to bbolt database file (default: var/cache.db)
+Store Node Options:
+  --port            Port for store server (default: 8081)
+  --db-path         Path to bbolt database file (default: var/store.db)
 
 Master Node Options:
   --port            Port for master server (default: 8080)
-  --cache-url       URL of cache server (default: http://localhost:8081)
+  --store-url       URL of store server (default: http://localhost:8081)
   --heartbeat-timeout  Worker heartbeat timeout (default: 30s)
 
 Worker Node Options:
@@ -261,8 +261,8 @@ Job Management Options:
   --job-id          Job ID (required for status/results/cancel)
 
 Example Usage:
-  # Terminal 1: Start cache
-  toyreduce cache
+  # Terminal 1: Start store
+  toyreduce store
 
   # Terminal 2: Start master
   toyreduce master

@@ -33,7 +33,6 @@
 		}
 	}
 
-
 	function showDetails(job: any) {
 		// @ts-expect-error - svelte-simple-modal not yet compatible with Svelte 5 component types
 		open(JobDetails, {
@@ -121,7 +120,7 @@
 									View Results
 								</button>
 							{/if}
-							<div class="text-right text-xs text-[var(--text-muted)] pt-1">
+							<div class="pt-1 text-right text-xs text-[var(--text-muted)]">
 								{formatDate(job.submitted_at)}
 							</div>
 						</div>

@@ -4,7 +4,7 @@
  */
 export function formatDate(dateString: string): string {
 	if (!dateString) return 'Unknown';
-	
+
 	try {
 		// Handle Go timestamp format with microseconds (6 digits)
 		// Convert to JavaScript format (3 digits for milliseconds)
@@ -19,7 +19,7 @@ export function formatDate(dateString: string): string {
 				jsDateString = `${base}.${milliseconds}${timezone}`;
 			}
 		}
-		
+
 		const parsedDate = new Date(jsDateString);
 		if (isNaN(parsedDate.getTime())) {
 			console.warn('Invalid date string:', dateString);
@@ -37,7 +37,7 @@ export function formatDate(dateString: string): string {
  */
 export function formatRelativeTime(dateString: string): string {
 	if (!dateString) return 'Unknown';
-	
+
 	try {
 		// Handle Go timestamp format with microseconds (6 digits)
 		let jsDateString = dateString;
@@ -49,15 +49,15 @@ export function formatRelativeTime(dateString: string): string {
 				jsDateString = `${base}.${milliseconds}${timezone}`;
 			}
 		}
-		
+
 		const date = new Date(jsDateString);
 		if (isNaN(date.getTime())) {
 			return dateString;
 		}
-		
+
 		const now = new Date();
 		const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-		
+
 		if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
 		const diffInMinutes = Math.floor(diffInSeconds / 60);
 		if (diffInMinutes < 60) return `${diffInMinutes}m ago`;

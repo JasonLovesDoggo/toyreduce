@@ -12,10 +12,10 @@ import (
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
 )
 
-// Client handles HTTP communication with master and cache
+// Client handles HTTP communication with master and store
 type Client struct {
 	masterURL string
-	cacheURL  string
+	storeURL  string
 	http      *http.Client
 }
 
@@ -60,8 +60,8 @@ func (c *Client) Register(workerID string, version string, executors []string) (
 		return nil, fmt.Errorf("registration failed: %s", regResp.Error)
 	}
 
-	// Store cache URL
-	c.cacheURL = regResp.CacheURL
+	// Store store URL
+	c.storeURL = regResp.StoreURL
 
 	return &regResp, nil
 }
@@ -143,7 +143,7 @@ func (c *Client) SendHeartbeat(workerID string) error {
 	return nil
 }
 
-// StoreMapOutput sends map output to cache
+// StoreMapOutput sends map output to store
 func (c *Client) StoreMapOutput(taskID string, partition int, data []toyreduce.KeyValue) error {
 	req := protocol.IntermediateData{
 		TaskID:    taskID,
@@ -156,7 +156,7 @@ func (c *Client) StoreMapOutput(taskID string, partition int, data []toyreduce.K
 		return err
 	}
 
-	url := fmt.Sprintf("%s/intermediate/map/%s/%d", c.cacheURL, taskID, partition)
+	url := fmt.Sprintf("%s/intermediate/map/%s/%d", c.storeURL, taskID, partition)
 
 	resp, err := c.http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
@@ -171,9 +171,9 @@ func (c *Client) StoreMapOutput(taskID string, partition int, data []toyreduce.K
 	return nil
 }
 
-// GetReduceInput retrieves intermediate data for a partition from cache
+// GetReduceInput retrieves intermediate data for a partition from store
 func (c *Client) GetReduceInput(partition int) ([]toyreduce.KeyValue, error) {
-	url := fmt.Sprintf("%s/intermediate/reduce/%d", c.cacheURL, partition)
+	url := fmt.Sprintf("%s/intermediate/reduce/%d", c.storeURL, partition)
 
 	resp, err := c.http.Get(url)
 	if err != nil {
@@ -193,7 +193,7 @@ func (c *Client) GetReduceInput(partition int) ([]toyreduce.KeyValue, error) {
 	return data, nil
 }
 
-// StoreReduceOutput sends reduce output to cache
+// StoreReduceOutput sends reduce output to store
 func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyValue) error {
 	req := protocol.IntermediateData{
 		TaskID: taskID,
@@ -206,7 +206,7 @@ func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyVal
 		return err
 	}
 
-	url := fmt.Sprintf("%s/results/%s", c.cacheURL, taskID)
+	url := fmt.Sprintf("%s/results/%s", c.storeURL, taskID)
 
 	resp, err := c.http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {

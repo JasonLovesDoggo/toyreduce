@@ -53,7 +53,7 @@ func (n *Node) Start() error {
 		return fmt.Errorf("registration failed: %w", err)
 	}
 
-	log.Printf("[WORKER:%s] Registration successful (cache: %s)", n.id, regResp.CacheURL)
+	log.Printf("[WORKER:%s] Registration successful (store: %s)", n.id, regResp.StoreURL)
 
 	// Start heartbeat goroutine
 	go n.heartbeatLoop()

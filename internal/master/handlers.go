@@ -36,13 +36,13 @@ func NewServer(cfg Config) (*Server, error) {
 	}
 	s.setupRoutes()
 
-	// Check cache health
-	if cfg.CacheURL != "" {
-		log.Printf("[MASTER] Checking cache health at %s", cfg.CacheURL)
-		if err := s.checkCacheHealth(cfg.CacheURL); err != nil {
-			return nil, fmt.Errorf("cache health check failed: %w", err)
+	// Check store health
+	if cfg.StoreURL != "" {
+		log.Printf("[MASTER] Checking store health at %s", cfg.StoreURL)
+		if err := s.checkStoreHealth(cfg.StoreURL); err != nil {
+			return nil, fmt.Errorf("store health check failed: %w", err)
 		}
-		log.Printf("[MASTER] Cache is healthy")
+		log.Printf("[MASTER] store is healthy")
 	}
 
 	// Start health monitor
@@ -75,11 +75,11 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("GET /api/status", httpx.Wrap(s.handleStatus))
 	s.mux.HandleFunc("GET /health", httpx.Wrap(s.handleHealth))
 
-	// Cache proxy endpoints
-	s.mux.HandleFunc("GET /api/cache/stats", httpx.Wrap(s.handleCacheStats))
-	s.mux.HandleFunc("POST /api/cache/reset", httpx.Wrap(s.handleCacheReset))
-	s.mux.HandleFunc("POST /api/cache/compact", httpx.Wrap(s.handleCacheCompact))
-	s.mux.HandleFunc("GET /api/cache/health", httpx.Wrap(s.handleCacheHealthCheck))
+	// Store proxy endpoints
+	s.mux.HandleFunc("GET /api/store/stats", httpx.Wrap(s.handleStoreStats))
+	s.mux.HandleFunc("POST /api/store/reset", httpx.Wrap(s.handleStoreReset))
+	s.mux.HandleFunc("POST /api/store/compact", httpx.Wrap(s.handleStoreCompact))
+	s.mux.HandleFunc("GET /api/store/health", httpx.Wrap(s.handleStoreHealthCheck))
 
 	// UI - Serve the embedded Svelte app from root
 	staticFS, err := fs.Sub(uiFS, "static")
@@ -110,7 +110,7 @@ func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request
 
 	resp := protocol.WorkerRegistrationResponse{
 		WorkerID: req.WorkerID,
-		CacheURL: s.master.cacheURL,
+		StoreURL: s.master.storeURL,
 		Success:  true,
 	}
 
@@ -211,17 +211,17 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// Cache proxy handlers
-func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) error {
-	cacheURL := s.master.cacheURL
-	if cacheURL == "" {
-		httpx.Error(w, http.StatusServiceUnavailable, "cache not configured")
+// Store proxy handlers
+func (s *Server) handleStoreStats(w http.ResponseWriter, r *http.Request) error {
+	storeUrl := s.master.storeURL
+	if storeUrl == "" {
+		httpx.Error(w, http.StatusServiceUnavailable, "store not configured")
 		return nil
 	}
 
-	resp, err := http.Get(cacheURL + "/stats")
+	resp, err := http.Get(storeUrl + "/stats")
 	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("cache unreachable: %v", err))
+		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("store unreachable: %v", err))
 		return nil
 	}
 	defer resp.Body.Close()
@@ -236,14 +236,14 @@ func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (s *Server) handleCacheReset(w http.ResponseWriter, r *http.Request) error {
-	cacheURL := s.master.cacheURL
-	if cacheURL == "" {
-		httpx.Error(w, http.StatusServiceUnavailable, "cache not configured")
+func (s *Server) handleStoreReset(w http.ResponseWriter, r *http.Request) error {
+	storeURL := s.master.storeURL
+	if storeURL == "" {
+		httpx.Error(w, http.StatusServiceUnavailable, "store not configured")
 		return nil
 	}
 
-	req, err := http.NewRequest("POST", cacheURL+"/reset", nil)
+	req, err := http.NewRequest("POST", storeURL+"/reset", nil)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
@@ -252,7 +252,7 @@ func (s *Server) handleCacheReset(w http.ResponseWriter, r *http.Request) error 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("cache unreachable: %v", err))
+		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("store unreachable: %v", err))
 		return nil
 	}
 	defer resp.Body.Close()
@@ -266,14 +266,14 @@ func (s *Server) handleCacheReset(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-func (s *Server) handleCacheCompact(w http.ResponseWriter, r *http.Request) error {
-	cacheURL := s.master.cacheURL
-	if cacheURL == "" {
-		httpx.Error(w, http.StatusServiceUnavailable, "cache not configured")
+func (s *Server) handleStoreCompact(w http.ResponseWriter, r *http.Request) error {
+	storeUrl := s.master.storeURL
+	if storeUrl == "" {
+		httpx.Error(w, http.StatusServiceUnavailable, "store not configured")
 		return nil
 	}
 
-	req, err := http.NewRequest("POST", cacheURL+"/compact", nil)
+	req, err := http.NewRequest("POST", storeUrl+"/compact", nil)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
@@ -282,7 +282,7 @@ func (s *Server) handleCacheCompact(w http.ResponseWriter, r *http.Request) erro
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("cache unreachable: %v", err))
+		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("store unreachable: %v", err))
 		return nil
 	}
 	defer resp.Body.Close()
@@ -296,9 +296,9 @@ func (s *Server) handleCacheCompact(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (s *Server) handleCacheHealthCheck(w http.ResponseWriter, r *http.Request) error {
-	cacheURL := s.master.cacheURL
-	if cacheURL == "" {
+func (s *Server) handleStoreHealthCheck(w http.ResponseWriter, r *http.Request) error {
+	storeUrl := s.master.storeURL
+	if storeUrl == "" {
 		httpx.JSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "unconfigured",
 			"healthy": false,
@@ -306,7 +306,7 @@ func (s *Server) handleCacheHealthCheck(w http.ResponseWriter, r *http.Request) 
 		return nil
 	}
 
-	err := s.checkCacheHealth(cacheURL)
+	err := s.checkStoreHealth(storeUrl)
 	if err != nil {
 		httpx.JSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "unhealthy",
@@ -436,20 +436,20 @@ func (s *Server) Close() error {
 	return nil
 }
 
-// checkCacheHealth checks if the cache server is responding
-func (s *Server) checkCacheHealth(cacheURL string) error {
+// checkStoreHealth checks if the store server is responding
+func (s *Server) checkStoreHealth(storeURL string) error {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
 
-	resp, err := client.Get(cacheURL + "/health")
+	resp, err := client.Get(storeURL + "/health")
 	if err != nil {
-		return fmt.Errorf("cache unreachable: %w", err)
+		return fmt.Errorf("store unreachable: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("cache returned status %d", resp.StatusCode)
+		return fmt.Errorf("store returned status %d", resp.StatusCode)
 	}
 
 	var health protocol.HealthResponse
@@ -458,7 +458,7 @@ func (s *Server) checkCacheHealth(cacheURL string) error {
 	}
 
 	if health.Status != "ok" {
-		return fmt.Errorf("cache status is %s", health.Status)
+		return fmt.Errorf("store status is %s", health.Status)
 	}
 
 	return nil

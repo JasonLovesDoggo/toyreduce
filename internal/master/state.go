@@ -36,7 +36,7 @@ type JobState struct {
 // Master coordinates MapReduce jobs in a long-running cluster
 type Master struct {
 	// Configuration
-	cacheURL         string
+	storeURL         string
 	heartbeatTimeout time.Duration
 	storage          Storage
 
@@ -55,7 +55,7 @@ type Master struct {
 // Config holds master configuration
 type Config struct {
 	Port             int
-	CacheURL         string
+	StoreURL         string
 	HeartbeatTimeout time.Duration
 	DBPath           string // Path to bbolt database (empty = no persistence)
 }
@@ -82,7 +82,7 @@ func NewMaster(cfg Config) (*Master, error) {
 	}
 
 	m := &Master{
-		cacheURL:         cfg.CacheURL,
+		storeURL:         cfg.StoreURL,
 		heartbeatTimeout: heartbeatTimeout,
 		storage:          storage,
 		jobs:             make(map[string]*protocol.Job),
@@ -464,7 +464,7 @@ func (m *Master) GetConfig() map[string]interface{} {
 	defer m.mu.RUnlock()
 
 	return map[string]interface{}{
-		"cache_url":         m.cacheURL,
+		"store_url":         m.storeURL,
 		"heartbeat_timeout": m.heartbeatTimeout.String(),
 	}
 }
@@ -541,7 +541,7 @@ func (m *Master) completeJob(jobID string) {
 	duration := job.CompletedAt.Sub(job.StartedAt)
 	log.Printf("[MASTER] Job %s completed in %v", jobID, duration)
 
-	// Fetch results from cache
+	// Fetch results from store
 	go m.fetchJobResults(jobID)
 
 	// Clear current job and start next
@@ -575,15 +575,15 @@ func (m *Master) checkJobCompletion() {
 	}
 }
 
-// fetchJobResults fetches the final results from cache and stores them in the job
+// fetchJobResults fetches the final results from store and stores them in the job
 func (m *Master) fetchJobResults(jobID string) {
 	job := m.GetJob(jobID)
 	if job == nil {
 		return
 	}
 
-	// Fetch job-specific results from cache
-	results, err := m.getJobResultsFromCache(jobID)
+	// Fetch job-specific results from store
+	results, err := m.getJobResultsFromStore(jobID)
 	if err != nil {
 		log.Printf("[MASTER] Failed to fetch results for job %s: %v", jobID, err)
 		return
@@ -602,13 +602,13 @@ func (m *Master) fetchJobResults(jobID string) {
 	}
 }
 
-// getJobResultsFromCache fetches results for a specific job from the cache server
-func (m *Master) getJobResultsFromCache(jobID string) ([]toyreduce.KeyValue, error) {
-	if m.cacheURL == "" {
-		return nil, fmt.Errorf("cache URL not configured")
+// getJobResultsFromStore fetches results for a specific job from the store server
+func (m *Master) getJobResultsFromStore(jobID string) ([]toyreduce.KeyValue, error) {
+	if m.storeURL == "" {
+		return nil, fmt.Errorf("store URL not configured")
 	}
 
-	url := fmt.Sprintf("%s/results/job/%s", m.cacheURL, jobID)
+	url := fmt.Sprintf("%s/results/job/%s", m.storeURL, jobID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch results: %w", err)
@@ -616,7 +616,7 @@ func (m *Master) getJobResultsFromCache(jobID string) ([]toyreduce.KeyValue, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("cache returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("store returned status %d", resp.StatusCode)
 	}
 
 	var results []toyreduce.KeyValue

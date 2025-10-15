@@ -5,7 +5,7 @@
 	import WorkerStatus from '$lib/components/WorkerStatus.svelte';
 	import JobList from '$lib/components/JobList.svelte';
 	import JobSubmitForm from '$lib/components/JobSubmitForm.svelte';
-	import CacheVisualization from '$lib/components/CacheVisualization.svelte';
+	import StoreVisualization from '$lib/components/StoreVisualization.svelte';
 	import ResultsViewer from '$lib/components/ResultsViewer.svelte';
 	import { formatRelativeTime } from '$lib/utils/date';
 
@@ -18,19 +18,18 @@
 	let error = $state('');
 
 	// Get active tab and job from URL query parameters
-	let activeTab = $derived<'jobs' | 'results' | 'cache' | 'workers'>(
-		(page.url.searchParams.get('tab') as 'jobs' | 'results' | 'cache' | 'workers') || 'jobs'
+	let activeTab = $derived<'jobs' | 'results' | 'store' | 'workers'>(
+		(page.url.searchParams.get('tab') as 'jobs' | 'results' | 'store' | 'workers') || 'jobs'
 	);
 	let selectedJobID = $derived(page.url.searchParams.get('job') || '');
 
-	function setTab(tab: 'jobs' | 'results' | 'cache' | 'workers') {
+	function setTab(tab: 'jobs' | 'results' | 'store' | 'workers') {
 		goto(`?tab=${tab}`, { replaceState: false, keepFocus: true });
 	}
 
 	function viewJobResults(jobId: string) {
 		goto(`?tab=results&job=${jobId}`, { replaceState: false, keepFocus: true });
 	}
-
 
 	async function fetchData() {
 		try {
@@ -130,12 +129,12 @@
 				Results
 			</button>
 			<button
-				onclick={() => setTab('cache')}
-				class="tab pb-3 text-sm tracking-wider uppercase {activeTab === 'cache'
+				onclick={() => setTab('store')}
+				class="tab pb-3 text-sm tracking-wider uppercase {activeTab === 'store'
 					? 'active text-[var(--fg)]'
 					: 'text-[var(--text-muted)]'}"
 			>
-				Cache
+				Store
 			</button>
 			<button
 				onclick={() => setTab('workers')}
@@ -169,12 +168,18 @@
 			<div class="space-y-8">
 				<WorkerStatus {workers} />
 				<JobSubmitForm onSubmit={handleJobSubmit} />
-				<JobList {jobs} onCancel={handleJobCancel} onRefresh={fetchData} {API_BASE} onViewResults={viewJobResults} />
+				<JobList
+					{jobs}
+					onCancel={handleJobCancel}
+					onRefresh={fetchData}
+					{API_BASE}
+					onViewResults={viewJobResults}
+				/>
 			</div>
 		{:else if activeTab === 'results'}
 			<ResultsViewer {API_BASE} />
-		{:else if activeTab === 'cache'}
-			<CacheVisualization {API_BASE} />
+		{:else if activeTab === 'store'}
+			<StoreVisualization {API_BASE} />
 		{:else if activeTab === 'workers'}
 			<div class="space-y-8">
 				<!-- Config Info -->
@@ -183,9 +188,9 @@
 					<div class="grid grid-cols-2 gap-6">
 						<div>
 							<div class="mb-2 text-xs tracking-wider text-[var(--text-muted)] uppercase">
-								Cache URL
+								Store URL
 							</div>
-							<div class="font-mono text-sm text-[var(--fg)]">{config.cache_url || '—'}</div>
+							<div class="font-mono text-sm text-[var(--fg)]">{config.store_url || '—'}</div>
 						</div>
 						<div>
 							<div class="mb-2 text-xs tracking-wider text-[var(--text-muted)] uppercase">

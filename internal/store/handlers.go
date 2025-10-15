@@ -1,4 +1,4 @@
-package cache
+package store
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ type Server struct {
 	mux     *http.ServeMux
 }
 
-// NewServer creates a new cache server
+// NewServer creates a new store server
 func NewServer(dbPath string) (*Server, error) {
 	storage, err := NewStorage(dbPath)
 	if err != nil {
@@ -68,7 +68,7 @@ func (s *Server) handleStoreMapOutput(w http.ResponseWriter, r *http.Request) er
 	}
 
 	s.storage.StoreMapOutput(partition, data.Data)
-	log.Printf("[CACHE] Stored %d KVs for partition %d from task %s", len(data.Data), partition, data.TaskID)
+	log.Printf("[STORE] Stored %d KVs for partition %d from task %s", len(data.Data), partition, data.TaskID)
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	return nil
@@ -83,7 +83,7 @@ func (s *Server) handleGetReduceInput(w http.ResponseWriter, r *http.Request) er
 	}
 
 	data := s.storage.GetReduceInput(partition)
-	log.Printf("[CACHE] Retrieved %d KVs for partition %d", len(data), partition)
+	log.Printf("[STORE] Retrieved %d KVs for partition %d", len(data), partition)
 
 	httpx.JSON(w, http.StatusOK, data)
 	return nil
@@ -104,7 +104,7 @@ func (s *Server) handleStoreReduceOutput(w http.ResponseWriter, r *http.Request)
 	}
 
 	s.storage.StoreReduceOutput(taskID, data.JobID, data.Data)
-	log.Printf("[CACHE] Stored reduce results for job %s task %s (%d KVs)", data.JobID, taskID, len(data.Data))
+	log.Printf("[STORE] Stored reduce results for job %s task %s (%d KVs)", data.JobID, taskID, len(data.Data))
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	return nil
@@ -127,7 +127,7 @@ func (s *Server) handleGetJobResults(w http.ResponseWriter, r *http.Request) err
 	jobID := r.PathValue("jobID")
 
 	data := s.storage.GetJobResults(jobID)
-	log.Printf("[CACHE] Retrieved results for job %s (%d KVs)", jobID, len(data))
+	log.Printf("[STORE] Retrieved results for job %s (%d KVs)", jobID, len(data))
 
 	httpx.JSON(w, http.StatusOK, data)
 	return nil
@@ -135,26 +135,26 @@ func (s *Server) handleGetJobResults(w http.ResponseWriter, r *http.Request) err
 
 func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) error {
 	if err := s.storage.Reset(); err != nil {
-		log.Printf("[CACHE] Reset error: %v", err)
+		log.Printf("[STORE] Reset error: %v", err)
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
 	}
-	log.Println("[CACHE] Storage reset")
+	log.Println("[STORE] Storage reset")
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "reset"})
 	return nil
 }
 
 func (s *Server) handleCompact(w http.ResponseWriter, r *http.Request) error {
-	log.Println("[CACHE] Starting database compaction")
+	log.Println("[STORE] Starting database compaction")
 
 	if err := s.storage.Compact(); err != nil {
-		log.Printf("[CACHE] Compact error: %v", err)
+		log.Printf("[STORE] Compact error: %v", err)
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
 	}
 
-	log.Println("[CACHE] Database compacted successfully")
+	log.Println("[STORE] Database compacted successfully")
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "compacted"})
 	return nil
@@ -174,6 +174,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) error {
 // Start starts the HTTP server
 func (s *Server) Start(port int) error {
 	addr := ":" + strconv.Itoa(port)
-	log.Printf("[CACHE] Starting cache server on %s", addr)
+	log.Printf("[STORE] Starting store server on %s", addr)
 	return http.ListenAndServe(addr, s.mux)
 }

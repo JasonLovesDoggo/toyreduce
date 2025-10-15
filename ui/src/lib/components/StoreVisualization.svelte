@@ -6,21 +6,21 @@
 	let loading = $state(true);
 	let actionLoading = $state('');
 
-	async function fetchCacheData() {
+	async function fetchStoreData() {
 		try {
 			// Fetch stats
-			const statsRes = await fetch(`${API_BASE}/api/cache/stats`);
+			const statsRes = await fetch(`${API_BASE}/api/store/stats`);
 			if (statsRes.ok) {
 				stats = await statsRes.json();
 			}
 
 			// Fetch health
-			const healthRes = await fetch(`${API_BASE}/api/cache/health`);
+			const healthRes = await fetch(`${API_BASE}/api/store/health`);
 			if (healthRes.ok) {
 				health = await healthRes.json();
 			}
 		} catch (err) {
-			console.error('Failed to fetch cache data:', err);
+			console.error('Failed to fetch store data:', err);
 		} finally {
 			loading = false;
 		}
@@ -29,7 +29,7 @@
 	async function handleReset() {
 		if (
 			!confirm(
-				'Are you sure you want to reset the cache? This will delete all intermediate and final data.'
+				'Are you sure you want to reset the store? This will delete all intermediate and final data.'
 			)
 		) {
 			return;
@@ -37,16 +37,16 @@
 
 		actionLoading = 'reset';
 		try {
-			const res = await fetch(`${API_BASE}/api/cache/reset`, { method: 'POST' });
+			const res = await fetch(`${API_BASE}/api/store/reset`, { method: 'POST' });
 			if (res.ok) {
-				alert('Cache reset successfully');
-				fetchCacheData();
+				alert('Store reset successfully');
+				fetchStoreData();
 			} else {
 				const data = await res.json();
-				alert(`Failed to reset cache: ${data.error || 'Unknown error'}`);
+				alert(`Failed to reset store: ${data.error || 'Unknown error'}`);
 			}
 		} catch (err) {
-			alert(`Failed to reset cache: ${err}`);
+			alert(`Failed to reset store: ${err}`);
 		} finally {
 			actionLoading = '';
 		}
@@ -55,16 +55,16 @@
 	async function handleCompact() {
 		actionLoading = 'compact';
 		try {
-			const res = await fetch(`${API_BASE}/api/cache/compact`, { method: 'POST' });
+			const res = await fetch(`${API_BASE}/api/store/compact`, { method: 'POST' });
 			if (res.ok) {
-				alert('Cache compacted successfully');
-				fetchCacheData();
+				alert('Store compacted successfully');
+				fetchStoreData();
 			} else {
 				const data = await res.json();
-				alert(`Failed to compact cache: ${data.error || 'Unknown error'}`);
+				alert(`Failed to compact store: ${data.error || 'Unknown error'}`);
 			}
 		} catch (err) {
-			alert(`Failed to compact cache: ${err}`);
+			alert(`Failed to compact store: ${err}`);
 		} finally {
 			actionLoading = '';
 		}
@@ -72,14 +72,14 @@
 
 	// Fetch on mount
 	$effect(() => {
-		fetchCacheData();
+		fetchStoreData();
 	});
 </script>
 
 <div class="space-y-8">
 	<!-- Health Status -->
 	<div class="border border-[var(--border)] bg-[var(--surface)] p-8">
-		<h2 class="mb-6 text-lg font-semibold text-[var(--fg)]">Cache Health</h2>
+		<h2 class="mb-6 text-lg font-semibold text-[var(--fg)]">Store Health</h2>
 		{#if loading}
 			<p class="text-sm text-[var(--text-muted)]">Loading...</p>
 		{:else if health}
@@ -104,7 +104,7 @@
 				</div>
 			</div>
 		{:else}
-			<p class="text-sm text-[var(--text-muted)]">Unable to check cache health</p>
+			<p class="text-sm text-[var(--text-muted)]">Unable to check store health</p>
 		{/if}
 	</div>
 
@@ -157,12 +157,12 @@
 				disabled={actionLoading !== ''}
 				class="bg-red-600 px-6 py-2 text-xs tracking-wider text-white uppercase transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30"
 			>
-				{actionLoading === 'reset' ? 'Resetting...' : 'Reset Cache'}
+				{actionLoading === 'reset' ? 'Resetting...' : 'Reset Store'}
 			</button>
 		</div>
 		<p class="mt-4 text-xs text-[var(--text-muted)]">
 			<strong>Compact:</strong> Optimize database storage without losing data.<br />
-			<strong>Reset:</strong> Delete all intermediate and final cached data. Use with caution.
+			<strong>Reset:</strong> Delete all intermediate and final stored data. Use with caution.
 		</p>
 	</div>
 </div>

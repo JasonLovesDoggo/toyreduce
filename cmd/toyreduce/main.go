@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
+	"pkg.jsn.cam/toyreduce/internal/cache"
 	master2 "pkg.jsn.cam/toyreduce/internal/master"
 	"pkg.jsn.cam/toyreduce/internal/worker"
-	"pkg.jsn.cam/toyreduce/pkg/cache"
 	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 

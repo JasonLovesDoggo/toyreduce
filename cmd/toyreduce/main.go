@@ -124,7 +124,11 @@ func runWorkerMode() {
 		HeartbeatInterval: *heartbeatInterval,
 	}
 
-	node := worker.NewNode(cfg)
+	node, err := worker.NewNode(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create worker: %v", err)
+	}
+
 	if err := node.Start(); err != nil {
 		log.Fatalf("Worker error: %v", err)
 	}

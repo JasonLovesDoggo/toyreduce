@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"log"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ type Config struct {
 	MasterURL         string
 	PollInterval      time.Duration
 	HeartbeatInterval time.Duration
+	DataDir           string // Directory for worker data storage
 }
 
 // Node represents a worker node
@@ -23,31 +25,60 @@ type Node struct {
 	id        string
 	client    *Client
 	processor *Processor
+	storage   *Storage
+	server    *Server
 	config    Config
 }
 
 // NewNode creates a new worker node
-func NewNode(cfg Config) *Node {
+func NewNode(cfg Config) (*Node, error) {
 	workerID := uuid.New().String()
 	client := NewClient(cfg.MasterURL)
 
-	return &Node{
-		id:     workerID,
-		client: client,
-		config: cfg,
+	// Determine data directory
+	dataDir := cfg.DataDir
+	if dataDir == "" {
+		dataDir = "./data/worker"
 	}
+
+	// Create storage
+	dbPath := filepath.Join(dataDir, "worker.db")
+	storage, err := NewStorage(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("create storage: %w", err)
+	}
+
+	// Create HTTP server for serving partition data
+	server, err := NewServer(storage)
+	if err != nil {
+		storage.Close()
+		return nil, fmt.Errorf("create server: %w", err)
+	}
+
+	return &Node{
+		id:      workerID,
+		client:  client,
+		storage: storage,
+		server:  server,
+		config:  cfg,
+	}, nil
 }
 
 // Start starts the worker main loop
 func (n *Node) Start() error {
 	log.Printf("[WORKER:%s] Starting worker (version: %s)", n.id, protocol.ToyReduceVersion)
 
+	// Start data server
+	n.server.Start()
+	dataEndpoint := n.server.GetEndpoint()
+	log.Printf("[WORKER:%s] Data server started at %s", n.id, dataEndpoint)
+
 	// Collect available executors
 	executors := workers.ListExecutors()
 	log.Printf("[WORKER:%s] Available executors: %v", n.id, executors)
 
-	// Register with master
-	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executors)
+	// Register with master (include data endpoint)
+	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executors, dataEndpoint)
 	if err != nil {
 		log.Printf("[WORKER:%s] Registration failed: %v", n.id, err)
 		return fmt.Errorf("registration failed: %w", err)
@@ -99,7 +130,7 @@ func (n *Node) taskLoop() {
 					time.Sleep(pollInterval)
 					continue
 				}
-				n.processor = NewProcessor(worker, n.client)
+				n.processor = NewProcessor(worker, n.client, n.storage)
 			}
 
 			if err := n.processor.ProcessMapTask(task.MapTask, n.id); err != nil {

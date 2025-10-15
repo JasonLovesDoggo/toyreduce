@@ -28,11 +28,12 @@ func NewClient(masterURL string) *Client {
 }
 
 // Register registers this worker with the master
-func (c *Client) Register(workerID string, version string, executors []string) (*protocol.WorkerRegistrationResponse, error) {
+func (c *Client) Register(workerID string, version string, executors []string, dataEndpoint string) (*protocol.WorkerRegistrationResponse, error) {
 	req := protocol.WorkerRegistrationRequest{
-		WorkerID:  workerID,
-		Version:   version,
-		Executors: executors,
+		WorkerID:     workerID,
+		Version:      version,
+		Executors:    executors,
+		DataEndpoint: dataEndpoint,
 	}
 
 	body, err := json.Marshal(req)
@@ -216,6 +217,45 @@ func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyVal
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("store reduce output failed: %s", resp.Status)
+	}
+
+	return nil
+}
+
+// FetchPartitionFromWorker fetches a specific partition from a worker's data endpoint
+func (c *Client) FetchPartitionFromWorker(workerEndpoint, jobID string, partition int) ([]toyreduce.KeyValue, error) {
+	url := fmt.Sprintf("%s/data/%s/partition/%d", workerEndpoint, jobID, partition)
+
+	resp, err := c.http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("fetch from worker %s: %w", workerEndpoint, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("worker %s returned status %d", workerEndpoint, resp.StatusCode)
+	}
+
+	var data []toyreduce.KeyValue
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("decode response from worker %s: %w", workerEndpoint, err)
+	}
+
+	return data, nil
+}
+
+// RequestCleanupFromWorker requests a worker to cleanup job data
+func (c *Client) RequestCleanupFromWorker(workerEndpoint, jobID string) error {
+	url := fmt.Sprintf("%s/cleanup/%s", workerEndpoint, jobID)
+
+	resp, err := c.http.Post(url, "application/json", nil)
+	if err != nil {
+		return fmt.Errorf("cleanup request to worker %s: %w", workerEndpoint, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("worker %s returned status %d", workerEndpoint, resp.StatusCode)
 	}
 
 	return nil

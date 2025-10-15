@@ -10,15 +10,17 @@ import (
 
 // Processor handles map and reduce task execution
 type Processor struct {
-	worker toyreduce.Worker
-	client *Client
+	worker  toyreduce.Worker
+	client  *Client
+	storage *Storage
 }
 
 // NewProcessor creates a new task processor
-func NewProcessor(worker toyreduce.Worker, client *Client) *Processor {
+func NewProcessor(worker toyreduce.Worker, client *Client, storage *Storage) *Processor {
 	return &Processor{
-		worker: worker,
-		client: client,
+		worker:  worker,
+		client:  client,
+		storage: storage,
 	}
 }
 
@@ -43,12 +45,12 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 	// Partition the output
 	partitioned := PartitionMapOutput(emitted, task.NumPartitions)
 
-	// Send each partition to store
+	// Store each partition locally
 	for partition, kvs := range partitioned {
-		if err := p.client.StoreMapOutput(task.ID, partition, kvs); err != nil {
+		if err := p.storage.StorePartition(task.JobID, partition, kvs); err != nil {
 			return fmt.Errorf("store partition %d error: %w", partition, err)
 		}
-		log.Printf("[WORKER:%s] Stored %d KVs for partition %d", workerID, len(kvs), partition)
+		log.Printf("[WORKER:%s] Stored %d KVs locally for partition %d", workerID, len(kvs), partition)
 	}
 
 	// Notify master of completion
@@ -62,16 +64,24 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 
 // ProcessReduceTask executes a reduce task
 func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string) error {
-	log.Printf("[WORKER:%s] Processing reduce task %s (partition %d)",
-		workerID, task.ID, task.Partition)
+	log.Printf("[WORKER:%s] Processing reduce task %s (partition %d) from %d workers",
+		workerID, task.ID, task.Partition, len(task.WorkerEndpoints))
 
-	// Fetch intermediate data from store
-	intermediate, err := p.client.GetReduceInput(task.Partition)
-	if err != nil {
-		return fmt.Errorf("get reduce input error: %w", err)
+	// Fetch partition data from all map workers
+	var intermediate []toyreduce.KeyValue
+	for _, endpoint := range task.WorkerEndpoints {
+		data, err := p.client.FetchPartitionFromWorker(endpoint, task.JobID, task.Partition)
+		if err != nil {
+			log.Printf("[WORKER:%s] Warning: Failed to fetch from %s: %v", workerID, endpoint, err)
+			// Continue with other workers - partial data is better than failure
+			continue
+		}
+		intermediate = append(intermediate, data...)
+		log.Printf("[WORKER:%s] Fetched %d KVs from %s", workerID, len(data), endpoint)
 	}
 
-	log.Printf("[WORKER:%s] Retrieved %d intermediate KVs", workerID, len(intermediate))
+	log.Printf("[WORKER:%s] Retrieved %d total intermediate KVs from %d workers",
+		workerID, len(intermediate), len(task.WorkerEndpoints))
 
 	// Shuffle and group by key
 	grouped := ShuffleAndGroup(intermediate)

@@ -28,6 +28,7 @@ const (
 // MapTask represents a chunk of data to be mapped
 type MapTask struct {
 	ID            string     `json:"id"`
+	JobID         string     `json:"job_id"`
 	Chunk         []string   `json:"chunk"`
 	Status        TaskStatus `json:"status"`
 	WorkerID      string     `json:"worker_id"`
@@ -40,15 +41,16 @@ type MapTask struct {
 
 // ReduceTask represents a partition to be reduced
 type ReduceTask struct {
-	ID          string     `json:"id"`
-	JobID       string     `json:"job_id"`
-	Partition   int        `json:"partition"`
-	Status      TaskStatus `json:"status"`
-	WorkerID    string     `json:"worker_id"`
-	StartTime   time.Time  `json:"start_time"`
-	CompletedAt time.Time  `json:"completed_at,omitempty"`
-	Version     string     `json:"version"` // for idempotency
-	RetryCount  int        `json:"retry_count"`
+	ID              string     `json:"id"`
+	JobID           string     `json:"job_id"`
+	Partition       int        `json:"partition"`
+	Status          TaskStatus `json:"status"`
+	WorkerID        string     `json:"worker_id"`
+	StartTime       time.Time  `json:"start_time"`
+	CompletedAt     time.Time  `json:"completed_at,omitempty"`
+	Version         string     `json:"version"` // for idempotency
+	RetryCount      int        `json:"retry_count"`
+	WorkerEndpoints []string   `json:"worker_endpoints,omitempty"` // Endpoints of workers with map task data
 }
 
 // Task is a union type for map and reduce tasks
@@ -60,9 +62,10 @@ type Task struct {
 
 // WorkerRegistrationRequest is sent by workers to register with master
 type WorkerRegistrationRequest struct {
-	WorkerID  string   `json:"worker_id"`
-	Version   string   `json:"version"`   // ToyReduce version
-	Executors []string `json:"executors"` // Supported executors
+	WorkerID     string   `json:"worker_id"`
+	Version      string   `json:"version"`       // ToyReduce version
+	Executors    []string `json:"executors"`     // Supported executors
+	DataEndpoint string   `json:"data_endpoint"` // HTTP endpoint for serving partition data
 }
 
 // WorkerRegistrationResponse is returned to workers upon registration

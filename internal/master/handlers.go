@@ -98,7 +98,7 @@ func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request
 	}
 
 	// Validate and register worker
-	if err := s.master.RegisterWorker(req.WorkerID, req.Version, req.Executors); err != nil {
+	if err := s.master.RegisterWorker(req.WorkerID, req.Version, req.Executors, req.DataEndpoint); err != nil {
 		resp := protocol.WorkerRegistrationResponse{
 			WorkerID: req.WorkerID,
 			Success:  false,

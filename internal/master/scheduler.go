@@ -137,6 +137,11 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 		log.Printf("[MASTER] Job %s: Map task %s completed by worker %s (%d tasks left)",
 			m.currentJobID, taskID, workerID, state.mapTasksLeft)
 
+		// Record worker endpoint for this map task
+		if worker, exists := m.workers[workerID]; exists {
+			state.mapWorkerEndpoints[taskID] = worker.DataEndpoint
+		}
+
 		// Persist task completion
 		if err := m.storage.SaveJob(job); err != nil {
 			log.Printf("[MASTER] Warning: Failed to persist job: %v", err)

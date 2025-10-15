@@ -19,6 +19,7 @@ type WorkerInfo struct {
 	ID              string
 	Version         string
 	Executors       []string
+	DataEndpoint    string // HTTP endpoint for fetching partition data
 	LastHeartbeat   time.Time
 	CurrentTask     string
 	InProgressSince time.Time
@@ -26,11 +27,12 @@ type WorkerInfo struct {
 
 // JobState holds execution state for a single job
 type JobState struct {
-	mapTasks        []*protocol.MapTask
-	reduceTasks     []*protocol.ReduceTask
-	mapTasksLeft    int
-	reduceTasksLeft int
-	worker          toyreduce.Worker // Executor implementation for this job
+	mapTasks           []*protocol.MapTask
+	reduceTasks        []*protocol.ReduceTask
+	mapTasksLeft       int
+	reduceTasksLeft    int
+	worker             toyreduce.Worker  // Executor implementation for this job
+	mapWorkerEndpoints map[string]string // taskID → worker data endpoint
 }
 
 // Master coordinates MapReduce jobs in a long-running cluster
@@ -223,6 +225,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 	for chunk := range chunks {
 		task := &protocol.MapTask{
 			ID:            uuid.New().String(),
+			JobID:         jobID,
 			Chunk:         chunk,
 			Status:        protocol.TaskStatusIdle,
 			Version:       uuid.New().String(),
@@ -233,10 +236,11 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 
 	// Create job state
 	state := &JobState{
-		mapTasks:     mapTasks,
-		reduceTasks:  []*protocol.ReduceTask{},
-		mapTasksLeft: len(mapTasks),
-		worker:       worker,
+		mapTasks:           mapTasks,
+		reduceTasks:        []*protocol.ReduceTask{},
+		mapTasksLeft:       len(mapTasks),
+		worker:             worker,
+		mapWorkerEndpoints: make(map[string]string),
 	}
 	m.jobStates[jobID] = state
 
@@ -249,7 +253,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 }
 
 // RegisterWorker registers a new worker with version and capability validation
-func (m *Master) RegisterWorker(workerID, version string, executors []string) error {
+func (m *Master) RegisterWorker(workerID, version string, executors []string, dataEndpoint string) error {
 	// Validate version compatibility
 	compatible, err := protocol.IsCompatibleVersion(version, protocol.ToyReduceVersion)
 	if err != nil {
@@ -266,10 +270,11 @@ func (m *Master) RegisterWorker(workerID, version string, executors []string) er
 		ID:            workerID,
 		Version:       version,
 		Executors:     executors,
+		DataEndpoint:  dataEndpoint,
 		LastHeartbeat: time.Now(),
 	}
-	log.Printf("[MASTER] Worker registered: %s (version: %s, executors: %v, total: %d)",
-		workerID, version, executors, len(m.workers))
+	log.Printf("[MASTER] Worker registered: %s (version: %s, executors: %v, endpoint: %s, total: %d)",
+		workerID, version, executors, dataEndpoint, len(m.workers))
 
 	return nil
 }
@@ -494,14 +499,27 @@ func (m *Master) transitionToReducePhase() {
 	// Mark map phase as complete
 	job.MapPhaseCompletedAt = time.Now()
 
+	// Collect unique worker endpoints from completed map tasks
+	workerEndpoints := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, endpoint := range state.mapWorkerEndpoints {
+		if !seen[endpoint] {
+			workerEndpoints = append(workerEndpoints, endpoint)
+			seen[endpoint] = true
+		}
+	}
+
+	log.Printf("[MASTER] Job %s: Collected %d unique worker endpoints for reduce phase", m.currentJobID, len(workerEndpoints))
+
 	// Create reduce tasks (one per partition)
 	for i := 0; i < job.ReduceTasks; i++ {
 		task := &protocol.ReduceTask{
-			ID:        uuid.New().String(),
-			JobID:     m.currentJobID,
-			Partition: i,
-			Status:    protocol.TaskStatusIdle,
-			Version:   uuid.New().String(),
+			ID:              uuid.New().String(),
+			JobID:           m.currentJobID,
+			Partition:       i,
+			Status:          protocol.TaskStatusIdle,
+			Version:         uuid.New().String(),
+			WorkerEndpoints: workerEndpoints, // Include all worker endpoints
 		}
 		state.reduceTasks = append(state.reduceTasks, task)
 	}
@@ -536,6 +554,7 @@ func (m *Master) isJobComplete(job *protocol.Job, state *JobState) bool {
 // completeJob marks a job as completed and handles cleanup
 func (m *Master) completeJob(jobID string) {
 	job := m.jobs[jobID]
+	state := m.jobStates[jobID]
 	job.Status = protocol.JobStatusCompleted
 	job.CompletedAt = time.Now()
 	duration := job.CompletedAt.Sub(job.StartedAt)
@@ -543,6 +562,9 @@ func (m *Master) completeJob(jobID string) {
 
 	// Fetch results from store
 	go m.fetchJobResults(jobID)
+
+	// Send cleanup notifications to workers
+	go m.cleanupWorkerData(jobID, state)
 
 	// Clear current job and start next
 	m.currentJobID = ""
@@ -625,4 +647,34 @@ func (m *Master) getJobResultsFromStore(jobID string) ([]toyreduce.KeyValue, err
 	}
 
 	return results, nil
+}
+
+// cleanupWorkerData sends cleanup requests to all workers that participated in the job
+func (m *Master) cleanupWorkerData(jobID string, state *JobState) {
+	// Collect unique worker endpoints
+	endpoints := make(map[string]bool)
+	for _, endpoint := range state.mapWorkerEndpoints {
+		endpoints[endpoint] = true
+	}
+
+	log.Printf("[MASTER] Cleaning up job %s data from %d workers", jobID, len(endpoints))
+
+	// Send cleanup requests to all workers
+	for endpoint := range endpoints {
+		go func(workerEndpoint string) {
+			url := fmt.Sprintf("%s/cleanup/%s", workerEndpoint, jobID)
+			resp, err := http.Post(url, "application/json", nil)
+			if err != nil {
+				log.Printf("[MASTER] Warning: Failed to send cleanup to %s: %v", workerEndpoint, err)
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode == http.StatusOK {
+				log.Printf("[MASTER] Cleanup successful for worker %s (job %s)", workerEndpoint, jobID)
+			} else {
+				log.Printf("[MASTER] Warning: Cleanup failed for worker %s: status %d", workerEndpoint, resp.StatusCode)
+			}
+		}(endpoint)
+	}
 }

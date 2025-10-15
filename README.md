@@ -19,13 +19,20 @@ toyreduce master --store-url http://localhost:8081
 toyreduce worker --master-url  http://localhost:8080
 toyreduce worker --master-url  http://localhost:8080
 
-# Submit job
-toyreduce submit --executor wordcount --path /var/data --reduce-tasks 4
+# Submit job (via CLI or web UI)
+toyreduce submit --executor wordcount --path /var/data/randomfile --reduce-tasks 4
+# Job submitted successfully!
+#   Job ID: 550e8400-e29b-41d4-a716-446655440000
+#   Status: pending
+#
+# Check status with: toyreduce status --job-id 550e8400-e29b-41d4-a716-446655440000
 
-# Output:
-cat ./store/results.txt
-the: 532
-mapreduce: 42
+# View results
+toyreduce results --job-id 550e8400-e29b-41d4-a716-446655440000
+# Job Results (2 entries):
+# ─────────────────────────────────────────────────────────
+# foo                            532
+# bar                            42
 ```
 
 ## How It Works

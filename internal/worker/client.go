@@ -118,30 +118,35 @@ func (c *Client) CompleteTask(taskID, workerID, version string, success bool, er
 	return nil
 }
 
-// SendHeartbeat sends a heartbeat to master
-func (c *Client) SendHeartbeat(workerID string) error {
+// SendHeartbeat sends a heartbeat to master and returns whether it was accepted
+func (c *Client) SendHeartbeat(workerID string) (bool, error) {
 	req := protocol.HeartbeatRequest{
 		Timestamp: time.Now(),
 	}
 
 	body, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	url := fmt.Sprintf("%s/api/workers/%s/heartbeat", c.masterURL, workerID)
 
 	resp, err := c.http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("heartbeat failed: %s", resp.Status)
+		return false, fmt.Errorf("heartbeat failed: %s", resp.Status)
 	}
 
-	return nil
+	var hbResp protocol.HeartbeatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&hbResp); err != nil {
+		return false, fmt.Errorf("failed to decode heartbeat response: %w", err)
+	}
+
+	return hbResp.OK, nil
 }
 
 // StoreMapOutput sends map output to store

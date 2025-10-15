@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/dustin/go-humanize"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
 )
 
@@ -88,12 +89,16 @@ func getJobStatusHTTP(masterURL, jobID string) {
 		log.Fatalf("Failed to decode response: %v", err)
 	}
 
+	// Convert chunk size MB to human-readable format
+	chunkSizeBytes := uint64(job.ChunkSize) * 1024 * 1024
+	chunkSizeHuman := humanize.Bytes(chunkSizeBytes)
+
 	fmt.Printf("Job Details:\n")
 	fmt.Printf("  ID:          %s\n", job.ID)
 	fmt.Printf("  Status:      %s\n", job.Status)
 	fmt.Printf("  Executor:    %s\n", job.Executor)
 	fmt.Printf("  Input Path:  %s\n", job.InputPath)
-	fmt.Printf("  Chunk Size:  %d\n", job.ChunkSize)
+	fmt.Printf("  Chunk Size:  %s\n", chunkSizeHuman)
 	fmt.Printf("  Reduce Tasks: %d\n", job.ReduceTasks)
 	fmt.Printf("  Submitted:   %s\n", job.SubmittedAt.Format("2006-01-02 15:04:05"))
 

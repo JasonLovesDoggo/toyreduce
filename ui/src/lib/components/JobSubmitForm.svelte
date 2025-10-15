@@ -12,7 +12,7 @@
 
 	let executor = $state('wordcount');
 	let inputPath = $state('');
-	let chunkSize = $state(1000);
+	let chunkSize = $state(16); // Default 16MB
 	let reduceTasks = $state(4);
 	let submitting = $state(false);
 
@@ -84,12 +84,14 @@
 					for="chunkSize"
 					class="mb-2 block text-xs tracking-wider text-[var(--text-muted)] uppercase"
 				>
-					Chunk Size
+					Chunk Size (MB)
 				</label>
 				<input
 					id="chunkSize"
 					type="number"
 					bind:value={chunkSize}
+					min="1"
+					placeholder="16"
 					class="w-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--fg)] tabular-nums focus:border-[var(--accent)] focus:outline-none"
 					required
 				/>

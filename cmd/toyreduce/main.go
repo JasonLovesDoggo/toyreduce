@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	master2 "pkg.jsn.cam/toyreduce/internal/master"
 	"pkg.jsn.cam/toyreduce/internal/store"
 	"pkg.jsn.cam/toyreduce/internal/worker"
@@ -112,6 +113,7 @@ func runWorkerMode() {
 	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
 	pollInterval := fs.Duration("poll-interval", 2*time.Second, "Task polling interval")
 	heartbeatInterval := fs.Duration("heartbeat-interval", 10*time.Second, "Heartbeat interval")
+	ephemeralStorage := fs.Bool("ephemeral-storage", false, "Use isolated storage per worker instance (allows multiple workers on one system)")
 
 	fs.Parse(os.Args[2:])
 
@@ -122,6 +124,7 @@ func runWorkerMode() {
 		MasterURL:         *masterURL,
 		PollInterval:      *pollInterval,
 		HeartbeatInterval: *heartbeatInterval,
+		EphemeralStorage:  *ephemeralStorage,
 	}
 
 	node, err := worker.NewNode(cfg)
@@ -139,7 +142,7 @@ func runSubmitJob() {
 	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
 	executor := fs.String("executor", "", "Executor to use (required)")
 	path := fs.String("path", "", "Path to input file (required)")
-	chunkSize := fs.Int("chunk-size", 1000, "Lines per chunk")
+	chunkSizeStr := fs.String("chunk-size", "16MB", "Chunk size (e.g., 16MB, 1GB, 512KB)")
 	reduceTasks := fs.Int("reduce-tasks", 4, "Number of reduce tasks")
 
 	fs.Parse(os.Args[2:])
@@ -150,7 +153,19 @@ func runSubmitJob() {
 		os.Exit(1)
 	}
 
-	submitJobHTTP(*masterURL, *executor, *path, *chunkSize, *reduceTasks)
+	// Parse human-readable size
+	chunkBytes, err := humanize.ParseBytes(*chunkSizeStr)
+	if err != nil {
+		log.Fatalf("Invalid chunk size '%s': %v", *chunkSizeStr, err)
+	}
+
+	// Convert to MB (round up to nearest MB)
+	chunkSizeMB := int((chunkBytes + 1024*1024 - 1) / (1024 * 1024))
+	if chunkSizeMB == 0 {
+		chunkSizeMB = 1 // Minimum 1MB
+	}
+
+	submitJobHTTP(*masterURL, *executor, *path, chunkSizeMB, *reduceTasks)
 }
 
 func runListJobs() {
@@ -252,12 +267,13 @@ Worker Node Options:
   --master-url      URL of master server (default: http://localhost:8080)
   --poll-interval   Task polling interval (default: 2s)
   --heartbeat-interval  Heartbeat interval (default: 10s)
+  --ephemeral-storage   Use isolated storage per worker instance (default: false)
 
 Submit Job Options:
   --master-url      URL of master server (default: http://localhost:8080)
   --executor        Executor to use (required)
   --path            Path to input file (required)
-  --chunk-size      Lines per chunk (default: 1000)
+  --chunk-size      Chunk size with units (default: 16MB) - e.g., 1MB, 512KB, 1GB
   --reduce-tasks    Number of reduce tasks (default: 4)
 
 Job Management Options:

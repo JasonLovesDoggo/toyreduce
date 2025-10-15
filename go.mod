@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 )

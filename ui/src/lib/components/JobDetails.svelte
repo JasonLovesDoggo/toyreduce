@@ -98,6 +98,13 @@
 		return Math.round((job.completed_tasks / job.total_tasks) * 100);
 	}
 
+	function formatChunkSize(sizeMB: number): string {
+		if (sizeMB >= 1024) {
+			return `${(sizeMB / 1024).toFixed(1)} GB`;
+		}
+		return `${sizeMB} MB`;
+	}
+
 	function handleCancel() {
 		onCancel();
 		close();
@@ -283,7 +290,7 @@
 			</div>
 			<div>
 				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">Chunk Size</div>
-				<div class="font-mono text-sm text-[var(--fg)] tabular-nums">{currentJob.chunk_size}</div>
+				<div class="font-mono text-sm text-[var(--fg)] tabular-nums">{formatChunkSize(currentJob.chunk_size)}</div>
 			</div>
 			<div class="col-span-2">
 				<div class="mb-1 text-xs tracking-wider text-[var(--text-muted)] uppercase">Input Path</div>

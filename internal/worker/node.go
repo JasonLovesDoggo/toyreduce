@@ -18,6 +18,7 @@ type Config struct {
 	PollInterval      time.Duration
 	HeartbeatInterval time.Duration
 	DataDir           string // Directory for worker data storage
+	EphemeralStorage  bool   // Use unique database path per worker instance (default: true)
 }
 
 // Node represents a worker node
@@ -38,11 +39,19 @@ func NewNode(cfg Config) (*Node, error) {
 	// Determine data directory
 	dataDir := cfg.DataDir
 	if dataDir == "" {
-		dataDir = "./data/worker"
+		dataDir = "./var/worker"
 	}
 
-	// Create storage
-	dbPath := filepath.Join(dataDir, "worker.db")
+	// Determine database path based on ephemeral storage flag
+	var dbPath string
+	if cfg.EphemeralStorage {
+		// Use UUID-based path - each worker instance gets isolated database
+		dbPath = filepath.Join(dataDir, workerID, "worker.db")
+	} else {
+		// Use shared path - single worker with persistent storage across restarts
+		dbPath = filepath.Join(dataDir, "worker.db")
+	}
+
 	storage, err := NewStorage(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("create storage: %w", err)
@@ -164,10 +173,37 @@ func (n *Node) heartbeatLoop() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		if err := n.client.SendHeartbeat(n.id); err != nil {
-			log.Printf("[WORKER:%s] Heartbeat failed: %v", n.id, err)
+		ok, err := n.client.SendHeartbeat(n.id)
+		if err != nil {
+			log.Printf("[WORKER:%s] Heartbeat request failed: %v", n.id, err)
+			continue
+		}
+
+		// If heartbeat was rejected (OK=false), master doesn't know about us
+		// This happens when master restarts and loses worker registrations
+		if !ok {
+			log.Printf("[WORKER:%s] Heartbeat rejected - master doesn't recognize worker, re-registering", n.id)
+			if err := n.reregister(); err != nil {
+				log.Printf("[WORKER:%s] Re-registration failed: %v", n.id, err)
+			} else {
+				log.Printf("[WORKER:%s] Re-registration successful", n.id)
+			}
 		}
 	}
+}
+
+// reregister attempts to re-register with the master
+func (n *Node) reregister() error {
+	executors := workers.ListExecutors()
+	dataEndpoint := n.server.GetEndpoint()
+
+	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executors, dataEndpoint)
+	if err != nil {
+		return fmt.Errorf("registration failed: %w", err)
+	}
+
+	log.Printf("[WORKER:%s] Re-registered with master (store: %s)", n.id, regResp.StoreURL)
+	return nil
 }
 
 // getWorkerByName returns the worker implementation by name from the global registry

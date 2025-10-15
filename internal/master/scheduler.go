@@ -56,7 +56,7 @@ func (m *Master) assignMapTask(task *protocol.MapTask, workerID string) protocol
 		worker.InProgressSince = time.Now()
 	}
 
-	log.Printf("[MASTER] Assigned map task %s to worker %s (chunk size: %d)",
+	log.Printf("[MASTER] Assigned map task %s to worker %s (chunk lines: %d)",
 		task.ID, workerID, len(task.Chunk))
 
 	return protocol.Task{

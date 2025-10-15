@@ -29,28 +29,50 @@ how does return work?
 5. Collect: combine all reducer outputs → final result.
 
 */
-
-func Chunk(filePath string, chunkSize int, out chan<- []string) error {
-	file, err := os.Open(filePath)
+// Chunk splits a file into line-preserving chunks roughly chunkSizeMB each.
+// It sends each chunk to the out channel and closes it when done.
+func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
+	f, err := os.Open(filePath)
 	if err != nil {
+		close(out)
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
+	defer close(out)
 
-	scanner := bufio.NewScanner(file)
-	var chunk []string
-	for scanner.Scan() {
-		chunk = append(chunk, scanner.Text())
-		if len(chunk) >= chunkSize {
-			out <- chunk // push one chunk
-			chunk = nil
+	targetBytes := int64(chunkSizeMB) * 1024 * 1024
+	sc := bufio.NewScanner(f)
+
+	var (
+		chunk      []string
+		chunkBytes int64
+	)
+
+	for sc.Scan() {
+		line := sc.Text()
+		lineBytes := int64(len(line) + 1) // include newline
+
+		switch {
+		case lineBytes > targetBytes && len(chunk) == 0:
+			// single huge line, must emit as-is
+			out <- []string{line}
+		case chunkBytes+lineBytes > targetBytes && len(chunk) > 0:
+			out <- chunk
+			chunk = []string{line}
+			chunkBytes = lineBytes
+		default:
+			chunk = append(chunk, line)
+			chunkBytes += lineBytes
 		}
+	}
+
+	if err := sc.Err(); err != nil {
+		return err
 	}
 	if len(chunk) > 0 {
 		out <- chunk
 	}
-	close(out)
-	return scanner.Err()
+	return nil
 }
 
 func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {

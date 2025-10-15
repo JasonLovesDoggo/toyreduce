@@ -291,6 +291,5 @@ Example Usage:
   toyreduce cancel --job-id <job-id>
 
   # List available executors
-  toyreduce list-executors
-`)
+  toyreduce list-executors`)
 }

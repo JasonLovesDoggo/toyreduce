@@ -1,34 +1,65 @@
 # ToyReduce
 
-ToyReduce is a lightweight distributed MapReduce system written in Go.
-It implements the core ideas from Google's MapReduce paper: **automatic parallelization, fault-tolerant task scheduling, and key-based data partitioning** — all over plain HTTP.
+A tiny, hackable distributed MapReduce system written in Go.
 
-Includes a **real-time web UI** with detailed performance metrics, job monitoring, and worker status tracking.
+It implements the core ideas from Google's MapReduce paper with some aspects of Hadoop's architecture: **automatic parallelization, fault-tolerant task scheduling, distributed intermediate storage, and peer-to-peer data transfer** — all over plain HTTP.
 
-## Overview
+Workers store intermediate data locally and shuffle via P2P, eliminating the centralized storage bottleneck. Includes a real-time web UI for job monitoring and submission.
+
+## Quick Start
+
+```bash
+# Terminal 1: Store (final results)
+toyreduce store
+
+# Terminal 2: Master (coordinator + web UI at :8080)
+toyreduce master --store-url http://localhost:8081
+
+# Terminal 3+: Workers (compute + local storage)
+toyreduce worker --master-url  http://localhost:8080
+toyreduce worker --master-url  http://localhost:8080
+
+# Submit job
+toyreduce submit --executor wordcount --path /var/data --reduce-tasks 4
+
+# Output:
+cat ./store/results.txt
+the: 532
+mapreduce: 42
+```
+
+## How It Works
+
+The system follows a Hadoop-like shuffle architecture:
+
+1. **Map Phase**: Workers execute map tasks and store partitioned intermediate data in local bbolt storage
+2. **Shuffle Phase**: Reduce workers fetch their assigned partition from all map workers in parallel via P2P HTTP requests
+3. **Reduce Phase**: Workers execute reduce tasks and send final results to the central store for persistence
+
+## Architecture
 
 The system runs three types of nodes:
 
-- **Master:** Splits input files into chunks, manages job queue, tracks map/reduce task states, and assigns work to idle workers. Includes embedded web UI for job submission and monitoring.
-- **Worker:** Executes map and reduce functions, fetching tasks from the master and storing results in the store.
-- **Store:** Acts as centralized storage for intermediate key-value pairs between map and reduce stages.
+- **Master** (`port 8080`): Manages job queue, assigns tasks to workers, tracks completion, provides web UI
+- **Workers** (ephemeral ports): Execute map/reduce tasks, store intermediate data in bbolt, serve partitions via HTTP
+- **Store** (`port 8081`): Persists final job results only (not intermediate data)
 
-This setup makes it easy to observe how MapReduce behaves without external systems like Hadoop or Spark.
+Workers register with the master and provide their data endpoint. During reduce phase, workers fetch partition data directly from other workers in parallel.
 
-## Run Example
+## Creating Custom Executors
 
-```bash
-# Start store (shared intermediate storage)
-toyreduce store --port 8081
+ToyReduce comes with built-in executors, but you can easily create your own by implementing the `Worker` interface:
 
-# Start master (manages job state and workers)
-toyreduce master --port 8080 \
-  --store-url http://localhost:8081 \
-  --executor wordcount \
-  --path var/testdata.log \
-  --reduce-tasks 4
-
-# Start workers (request tasks from master)
-toyreduce worker --master-url http://localhost:8080
-toyreduce worker --master-url http://localhost:8080
+```go
+type Worker interface {
+    Map(chunk []string, emit Emitter) error
+    Reduce(key string, values []string, emit Emitter) error
+    Description() string
+}
 ```
+
+**Examples:**
+- [wordcount](pkg/workers/wordcount/impl.go) - Count word frequencies in text files
+- [actioncount](pkg/workers/actioncount/impl.go) - Count action types in log files
+
+Register your executor in [pkg/workers/map.go](pkg/workers/map.go) and it will be available in the CLI and web UI.

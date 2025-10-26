@@ -127,18 +127,16 @@ func (n *Node) taskLoop() {
 			time.Sleep(pollInterval)
 
 		case protocol.TaskTypeMap:
-			// Get worker implementation for this task's executor
-			// The executor info is now embedded in the task (from current job)
-			// For now, we'll instantiate processor per task when we have multi-job support
-			// Currently using the old single-job approach
-			if n.processor == nil {
-				// Lazy initialization (for backwards compat during refactor)
-				worker := getWorkerByName("wordcount") // FIXME: get from task
-				if worker == nil {
-					log.Printf("[WORKER:%s] No worker implementation available", n.id)
-					time.Sleep(pollInterval)
-					continue
-				}
+			// Get worker implementation from task's executor field
+			worker := getWorkerByName(task.MapTask.Executor)
+			if worker == nil {
+				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.MapTask.Executor)
+				time.Sleep(pollInterval)
+				continue
+			}
+
+			// Create processor for this executor (supports different executors per task)
+			if n.processor == nil || n.processor.worker != worker {
 				n.processor = NewProcessor(worker, n.client, n.storage)
 			}
 
@@ -149,6 +147,19 @@ func (n *Node) taskLoop() {
 			}
 
 		case protocol.TaskTypeReduce:
+			// Get worker implementation from task's executor field
+			worker := getWorkerByName(task.ReduceTask.Executor)
+			if worker == nil {
+				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.ReduceTask.Executor)
+				time.Sleep(pollInterval)
+				continue
+			}
+
+			// Create processor for this executor (supports different executors per task)
+			if n.processor == nil || n.processor.worker != worker {
+				n.processor = NewProcessor(worker, n.client, n.storage)
+			}
+
 			if err := n.processor.ProcessReduceTask(task.ReduceTask, n.id); err != nil {
 				log.Printf("[WORKER:%s] Reduce task failed: %v", n.id, err)
 				// Notify master of failure

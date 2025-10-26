@@ -226,6 +226,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 		task := &protocol.MapTask{
 			ID:            uuid.New().String(),
 			JobID:         jobID,
+			Executor:      job.Executor,
 			Chunk:         chunk,
 			Status:        protocol.TaskStatusIdle,
 			Version:       uuid.New().String(),
@@ -516,6 +517,7 @@ func (m *Master) transitionToReducePhase() {
 		task := &protocol.ReduceTask{
 			ID:              uuid.New().String(),
 			JobID:           m.currentJobID,
+			Executor:        job.Executor,
 			Partition:       i,
 			Status:          protocol.TaskStatusIdle,
 			Version:         uuid.New().String(),

@@ -43,9 +43,10 @@ func TestGetNextTask_MapTask(t *testing.T) {
 	m.jobStates[jobID] = &JobState{
 		mapTasks: []*protocol.MapTask{
 			{
-				ID:     "map-1",
-				Status: protocol.TaskStatusIdle,
-				Chunk:  []string{"line1", "line2"},
+				ID:       "map-1",
+				Executor: "wordcount",
+				Status:   protocol.TaskStatusIdle,
+				Chunk:    []string{"line1", "line2"},
 			},
 		},
 		mapTasksLeft:       1,
@@ -104,6 +105,7 @@ func TestGetNextTask_ReduceTask(t *testing.T) {
 		reduceTasks: []*protocol.ReduceTask{
 			{
 				ID:        "reduce-1",
+				Executor:  "wordcount",
 				Status:    protocol.TaskStatusIdle,
 				Partition: 0,
 			},

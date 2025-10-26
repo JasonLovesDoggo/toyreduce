@@ -2,6 +2,9 @@ package workers
 
 import (
 	"pkg.jsn.cam/toyreduce/pkg/executors/actioncount"
+	"pkg.jsn.cam/toyreduce/pkg/executors/average"
+	"pkg.jsn.cam/toyreduce/pkg/executors/maxvalue"
+	"pkg.jsn.cam/toyreduce/pkg/executors/urldedup"
 	"pkg.jsn.cam/toyreduce/pkg/executors/wordcount"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 )
@@ -9,6 +12,9 @@ import (
 var Executors = map[string]toyreduce.Worker{
 	"wordcount":   wordcount.WordCountWorker{},
 	"actioncount": actioncount.ActionCountWorker{},
+	"maxvalue":    maxvalue.MaxValueWorker{},
+	"urldedup":    urldedup.URLDedupWorker{},
+	"average":     average.AverageWorker{},
 }
 
 func IsValidExecutor(name string) bool {

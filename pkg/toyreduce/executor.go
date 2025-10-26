@@ -78,12 +78,17 @@ func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
 func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
 	var all []KeyValue
 	for chunk := range chunks {
+		var chunkOutput []KeyValue
 		err := worker.Map(chunk, func(kv KeyValue) {
-			all = append(all, kv)
+			chunkOutput = append(chunkOutput, kv)
 		})
 		if err != nil {
 			return nil, err
 		}
+
+		// Apply combine phase to this chunk's output to reduce intermediate data
+		combined := CombinePhase(chunkOutput, worker)
+		all = append(all, combined...)
 	}
 	return all, nil
 }
@@ -94,6 +99,40 @@ func Shuffle(pairs []KeyValue) map[string][]string {
 		grouped[kv.Key] = append(grouped[kv.Key], kv.Value)
 	}
 	return grouped
+}
+
+// CombinePhase applies local aggregation to reduce intermediate data.
+// By default, uses the worker's Reduce() function unless:
+// - Worker implements DisableCombiner() returning true (skip combining)
+// - Worker implements CombinableWorker with Combine() (use custom logic)
+func CombinePhase(pairs []KeyValue, worker Worker) []KeyValue {
+	// Check if worker opts-out of combining
+	if disabler, ok := worker.(DisableCombinerCheck); ok {
+		if disabler.DisableCombiner() {
+			return pairs // Skip combining
+		}
+	}
+
+	// Shuffle pairs locally by key
+	grouped := Shuffle(pairs)
+
+	// Combine using appropriate function
+	var combined []KeyValue
+	emitter := func(kv KeyValue) {
+		combined = append(combined, kv)
+	}
+
+	for key, values := range grouped {
+		// Check if worker has custom Combine() method
+		if combinable, ok := worker.(CombinableWorker); ok {
+			combinable.Combine(key, values, emitter)
+		} else {
+			// Default: use Reduce() for combining
+			worker.Reduce(key, values, emitter)
+		}
+	}
+
+	return combined
 }
 
 func ReducePhase(groups map[string][]string, worker Worker) []KeyValue {

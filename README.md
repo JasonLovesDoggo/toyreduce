@@ -70,7 +70,7 @@ type Worker interface {
 ```
 
 **Examples:**
-- [wordcount](pkg/workers/wordcount/impl.go) - Count word frequencies in text files
+- [wordcount](pkg/jobs/wordcount/impl.go) - Count word frequencies in text files
 - [actioncount](pkg/workers/actioncount/impl.go) - Count action types in log files
 
 Register your executor in [pkg/workers/map.go](pkg/workers/map.go) and it will be available in the CLI and web UI.

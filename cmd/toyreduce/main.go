@@ -11,7 +11,7 @@ import (
 	master2 "pkg.jsn.cam/toyreduce/internal/master"
 	"pkg.jsn.cam/toyreduce/internal/store"
 	"pkg.jsn.cam/toyreduce/internal/worker"
-	"pkg.jsn.cam/toyreduce/pkg/workers"
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 )
 
 func main() {

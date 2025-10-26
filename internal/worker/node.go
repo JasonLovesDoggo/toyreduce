@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
-	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 // Config holds worker configuration
@@ -208,5 +208,5 @@ func (n *Node) reregister() error {
 
 // getWorkerByName returns the worker implementation by name from the global registry
 func getWorkerByName(name string) toyreduce.Worker {
-	return workers.GetWorker(name)
+	return workers.GetExecutor(name)
 }

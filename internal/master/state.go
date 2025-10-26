@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
-	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 // WorkerInfo tracks information about a registered worker
@@ -208,7 +208,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 	// Must be called with lock held
 
 	// Get worker implementation
-	worker := workers.GetWorker(job.Executor)
+	worker := workers.GetExecutor(job.Executor)
 	if worker == nil {
 		return fmt.Errorf("executor not found: %s", job.Executor)
 	}

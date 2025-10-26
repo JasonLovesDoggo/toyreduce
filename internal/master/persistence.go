@@ -3,8 +3,8 @@ package master
 import (
 	"log"
 
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
-	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 // persist saves the current state to storage
@@ -71,7 +71,7 @@ func (m *Master) restore() error {
 		}
 
 		// Restore worker implementation
-		worker := workers.GetWorker(job.Executor)
+		worker := workers.GetExecutor(job.Executor)
 		if worker == nil {
 			log.Printf("[MASTER] Warning: Executor not found for job %s: %s", jobID, job.Executor)
 			continue

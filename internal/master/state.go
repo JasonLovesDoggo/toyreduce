@@ -108,7 +108,7 @@ func (m *Master) SubmitJob(req protocol.JobSubmitRequest) (string, error) {
 	defer m.mu.Unlock()
 
 	// Validate executor exists
-	if !workers.IsValidExecutor(req.Executor) {
+	if !executors.IsValidExecutor(req.Executor) {
 		return "", fmt.Errorf("unknown executor: %s", req.Executor)
 	}
 
@@ -208,7 +208,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 	// Must be called with lock held
 
 	// Get worker implementation
-	worker := workers.GetExecutor(job.Executor)
+	worker := executors.GetExecutor(job.Executor)
 	if worker == nil {
 		return fmt.Errorf("executor not found: %s", job.Executor)
 	}

@@ -3,12 +3,13 @@ package worker
 import (
 	"testing"
 
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
 )
 
-// TestGetWorkerByName verifies that getWorkerByName returns correct executors
-func TestGetWorkerByName(t *testing.T) {
+// TestGetExecutor verifies that executors.GetExecutor returns correct executors
+func TestGetExecutor(t *testing.T) {
 	tests := []struct {
 		name     string
 		executor string
@@ -48,12 +49,12 @@ func TestGetWorkerByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			worker := getWorkerByName(tt.executor)
+			worker := executors.GetExecutor(tt.executor)
 			if tt.wantNil && worker != nil {
-				t.Errorf("getWorkerByName(%q) = %v, want nil", tt.executor, worker)
+				t.Errorf("executors.GetExecutor(%q) = %v, want nil", tt.executor, worker)
 			}
 			if !tt.wantNil && worker == nil {
-				t.Errorf("getWorkerByName(%q) = nil, want non-nil", tt.executor)
+				t.Errorf("executors.GetExecutor(%q) = nil, want non-nil", tt.executor)
 			}
 		})
 	}
@@ -67,8 +68,8 @@ func TestDynamicExecutorHandling(t *testing.T) {
 	}
 
 	// Test that we can get different executors
-	wordcountWorker := getWorkerByName("wordcount")
-	actioncountWorker := getWorkerByName("actioncount")
+	wordcountWorker := executors.GetExecutor("wordcount")
+	actioncountWorker := executors.GetExecutor("actioncount")
 
 	if wordcountWorker == nil {
 		t.Fatal("wordcount executor not found")
@@ -123,7 +124,7 @@ func TestTaskExecutorField(t *testing.T) {
 
 // TestProcessorWorkerAccess tests that we can access the worker field in Processor
 func TestProcessorWorkerAccess(t *testing.T) {
-	worker := getWorkerByName("wordcount")
+	worker := executors.GetExecutor("wordcount")
 	if worker == nil {
 		t.Fatal("wordcount executor not found")
 	}
@@ -147,10 +148,10 @@ func TestMultipleExecutorSwitching(t *testing.T) {
 		id: "test-worker",
 	}
 
-	executors := []string{"wordcount", "actioncount", "maxvalue", "urldedup", "average"}
+	executorsList := []string{"wordcount", "actioncount", "maxvalue", "urldedup", "average"}
 
-	for _, executorName := range executors {
-		worker := getWorkerByName(executorName)
+	for _, executorName := range executorsList {
+		worker := executors.GetExecutor(executorName)
 		if worker == nil {
 			t.Fatalf("executor %q not found", executorName)
 		}
@@ -174,11 +175,11 @@ func TestWorkerComparisonForExecutorChange(t *testing.T) {
 	}
 
 	// Start with wordcount
-	worker1 := getWorkerByName("wordcount")
+	worker1 := executors.GetExecutor("wordcount")
 	node.processor = NewProcessor(worker1, nil, nil)
 
 	// Different executor - should need recreation
-	worker3 := getWorkerByName("actioncount")
+	worker3 := executors.GetExecutor("actioncount")
 	shouldRecreate := node.processor.worker != worker3
 	if !shouldRecreate {
 		t.Error("Worker instance should be different for different executor")

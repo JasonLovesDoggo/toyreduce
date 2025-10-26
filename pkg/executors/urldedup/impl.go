@@ -2,6 +2,7 @@ package urldedup
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
@@ -44,7 +45,7 @@ func (w URLDedupWorker) Reduce(key string, values []string, emit toyreduce.Emitt
 	}
 
 	// Emit count of unique URLs for this domain
-	emit(toyreduce.KeyValue{Key: key, Value: string(rune(len(seen)))})
+	emit(toyreduce.KeyValue{Key: key, Value: strconv.Itoa(len(seen))})
 	return nil
 }
 

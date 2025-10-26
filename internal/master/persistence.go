@@ -71,7 +71,7 @@ func (m *Master) restore() error {
 		}
 
 		// Restore worker implementation
-		worker := workers.GetExecutor(job.Executor)
+		worker := executors.GetExecutor(job.Executor)
 		if worker == nil {
 			log.Printf("[MASTER] Warning: Executor not found for job %s: %s", jobID, job.Executor)
 			continue

@@ -87,7 +87,10 @@ func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
 		}
 
 		// Apply combine phase to this chunk's output to reduce intermediate data
-		combined := CombinePhase(chunkOutput, worker)
+		combined, err := CombinePhase(chunkOutput, worker)
+		if err != nil {
+			return nil, err
+		}
 		all = append(all, combined...)
 	}
 	return all, nil
@@ -105,11 +108,11 @@ func Shuffle(pairs []KeyValue) map[string][]string {
 // By default, uses the worker's Reduce() function unless:
 // - Worker implements DisableCombiner() returning true (skip combining)
 // - Worker implements CombinableWorker with Combine() (use custom logic)
-func CombinePhase(pairs []KeyValue, worker Worker) []KeyValue {
+func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
 	// Check if worker opts-out of combining
 	if disabler, ok := worker.(DisableCombinerCheck); ok {
 		if disabler.DisableCombiner() {
-			return pairs // Skip combining
+			return pairs, nil // Skip combining
 		}
 	}
 
@@ -125,14 +128,18 @@ func CombinePhase(pairs []KeyValue, worker Worker) []KeyValue {
 	for key, values := range grouped {
 		// Check if worker has custom Combine() method
 		if combinable, ok := worker.(CombinableWorker); ok {
-			combinable.Combine(key, values, emitter)
+			if err := combinable.Combine(key, values, emitter); err != nil {
+				return nil, err
+			}
 		} else {
 			// Default: use Reduce() for combining
-			worker.Reduce(key, values, emitter)
+			if err := worker.Reduce(key, values, emitter); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return combined
+	return combined, nil
 }
 
 func ReducePhase(groups map[string][]string, worker Worker) []KeyValue {

@@ -223,8 +223,8 @@ func runCancelJob() {
 
 func listExecutors() {
 	fmt.Println("Available executors:")
-	for _, name := range workers.ListExecutors() {
-		desc, err := workers.GetDescription(name)
+	for _, name := range executors.ListExecutors() {
+		desc, err := executors.GetDescription(name)
 		if err != nil {
 			log.Fatal(err)
 		}

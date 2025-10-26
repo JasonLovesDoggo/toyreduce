@@ -1,4 +1,4 @@
-package workers
+package executors
 
 import (
 	"pkg.jsn.cam/toyreduce/pkg/executors/actioncount"

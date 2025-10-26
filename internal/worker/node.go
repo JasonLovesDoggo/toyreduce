@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"pkg.jsn.cam/toyreduce/pkg/executors"
-	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
 )
 
@@ -83,7 +82,7 @@ func (n *Node) Start() error {
 	log.Printf("[WORKER:%s] Data server started at %s", n.id, dataEndpoint)
 
 	// Collect available executors
-	executors := workers.ListExecutors()
+	executors := executors.ListExecutors()
 	log.Printf("[WORKER:%s] Available executors: %v", n.id, executors)
 
 	// Register with master (include data endpoint)
@@ -128,7 +127,7 @@ func (n *Node) taskLoop() {
 
 		case protocol.TaskTypeMap:
 			// Get worker implementation from task's executor field
-			worker := getWorkerByName(task.MapTask.Executor)
+			worker := executors.GetExecutor(task.MapTask.Executor)
 			if worker == nil {
 				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.MapTask.Executor)
 				time.Sleep(pollInterval)
@@ -148,7 +147,7 @@ func (n *Node) taskLoop() {
 
 		case protocol.TaskTypeReduce:
 			// Get worker implementation from task's executor field
-			worker := getWorkerByName(task.ReduceTask.Executor)
+			worker := executors.GetExecutor(task.ReduceTask.Executor)
 			if worker == nil {
 				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.ReduceTask.Executor)
 				time.Sleep(pollInterval)
@@ -205,19 +204,14 @@ func (n *Node) heartbeatLoop() {
 
 // reregister attempts to re-register with the master
 func (n *Node) reregister() error {
-	executors := workers.ListExecutors()
+	executorOptions := executors.ListExecutors()
 	dataEndpoint := n.server.GetEndpoint()
 
-	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executors, dataEndpoint)
+	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executorOptions, dataEndpoint)
 	if err != nil {
 		return fmt.Errorf("registration failed: %w", err)
 	}
 
 	log.Printf("[WORKER:%s] Re-registered with master (store: %s)", n.id, regResp.StoreURL)
 	return nil
-}
-
-// getWorkerByName returns the worker implementation by name from the global registry
-func getWorkerByName(name string) toyreduce.Worker {
-	return workers.GetExecutor(name)
 }

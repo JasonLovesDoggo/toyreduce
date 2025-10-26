@@ -11,7 +11,7 @@ import (
 	master2 "pkg.jsn.cam/toyreduce/internal/master"
 	"pkg.jsn.cam/toyreduce/internal/store"
 	"pkg.jsn.cam/toyreduce/internal/worker"
-	"pkg.jsn.cam/toyreduce/pkg/workers"
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 )
 
 func main() {
@@ -111,7 +111,7 @@ func runMasterMode() {
 func runWorkerMode() {
 	fs := flag.NewFlagSet("worker", flag.ExitOnError)
 	masterURL := fs.String("master-url", "http://localhost:8080", "URL of master server")
-	pollInterval := fs.Duration("poll-interval", 2*time.Second, "Task polling interval")
+	pollInterval := fs.Duration("poll-interval", 500*time.Millisecond, "Task polling interval")
 	heartbeatInterval := fs.Duration("heartbeat-interval", 10*time.Second, "Heartbeat interval")
 	ephemeralStorage := fs.Bool("ephemeral-storage", false, "Use isolated storage per worker instance (allows multiple workers on one system)")
 
@@ -223,8 +223,8 @@ func runCancelJob() {
 
 func listExecutors() {
 	fmt.Println("Available executors:")
-	for _, name := range workers.ListExecutors() {
-		desc, err := workers.GetDescription(name)
+	for _, name := range executors.ListExecutors() {
+		desc, err := executors.GetDescription(name)
 		if err != nil {
 			log.Fatal(err)
 		}

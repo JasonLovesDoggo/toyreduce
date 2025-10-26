@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
-	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 // WorkerInfo tracks information about a registered worker
@@ -50,6 +50,10 @@ type Master struct {
 
 	// Worker registry
 	workers map[string]*WorkerInfo
+
+	// Async heartbeat processing
+	heartbeatChan chan string
+	shutdownChan  chan struct{}
 
 	mu sync.RWMutex
 }
@@ -91,7 +95,12 @@ func NewMaster(cfg Config) (*Master, error) {
 		jobStates:        make(map[string]*JobState),
 		jobQueue:         []string{},
 		workers:          make(map[string]*WorkerInfo),
+		heartbeatChan:    make(chan string, 100), // Buffered to prevent blocking
+		shutdownChan:     make(chan struct{}),
 	}
+
+	// Start async heartbeat processor
+	go m.processHeartbeats()
 
 	// Restore state from storage
 	if err := m.restore(); err != nil {
@@ -108,7 +117,7 @@ func (m *Master) SubmitJob(req protocol.JobSubmitRequest) (string, error) {
 	defer m.mu.Unlock()
 
 	// Validate executor exists
-	if !workers.IsValidExecutor(req.Executor) {
+	if !executors.IsValidExecutor(req.Executor) {
 		return "", fmt.Errorf("unknown executor: %s", req.Executor)
 	}
 
@@ -208,7 +217,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 	// Must be called with lock held
 
 	// Get worker implementation
-	worker := workers.GetWorker(job.Executor)
+	worker := executors.GetExecutor(job.Executor)
 	if worker == nil {
 		return fmt.Errorf("executor not found: %s", job.Executor)
 	}
@@ -226,6 +235,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 		task := &protocol.MapTask{
 			ID:            uuid.New().String(),
 			JobID:         jobID,
+			Executor:      job.Executor,
 			Chunk:         chunk,
 			Status:        protocol.TaskStatusIdle,
 			Version:       uuid.New().String(),
@@ -279,18 +289,49 @@ func (m *Master) RegisterWorker(workerID, version string, executors []string, da
 	return nil
 }
 
-// UpdateHeartbeat updates worker's last heartbeat time
+// UpdateHeartbeat updates worker's last heartbeat time (async via channel)
 func (m *Master) UpdateHeartbeat(workerID string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Check if worker exists without blocking
+	m.mu.RLock()
+	_, exists := m.workers[workerID]
+	m.mu.RUnlock()
 
-	worker, exists := m.workers[workerID]
 	if !exists {
 		return false
 	}
 
-	worker.LastHeartbeat = time.Now()
-	return true
+	// Send to channel (non-blocking if buffer is full)
+	select {
+	case m.heartbeatChan <- workerID:
+		return true
+	default:
+		// Channel full, but that's OK - heartbeat will be processed eventually
+		return true
+	}
+}
+
+// processHeartbeats processes heartbeat updates asynchronously
+func (m *Master) processHeartbeats() {
+	for {
+		select {
+		case workerID := <-m.heartbeatChan:
+			m.mu.Lock()
+			if worker, exists := m.workers[workerID]; exists {
+				worker.LastHeartbeat = time.Now()
+			}
+			m.mu.Unlock()
+		case <-m.shutdownChan:
+			return
+		}
+	}
+}
+
+// Shutdown gracefully shuts down the master and closes goroutines
+func (m *Master) Shutdown() {
+	close(m.shutdownChan)
+	if m.storage != nil {
+		m.storage.Close()
+	}
 }
 
 // GetJob returns job metadata
@@ -471,6 +512,7 @@ func (m *Master) GetConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"store_url":         m.storeURL,
 		"heartbeat_timeout": m.heartbeatTimeout.String(),
+		"executors":         executors.ListExecutors(),
 	}
 }
 
@@ -516,6 +558,7 @@ func (m *Master) transitionToReducePhase() {
 		task := &protocol.ReduceTask{
 			ID:              uuid.New().String(),
 			JobID:           m.currentJobID,
+			Executor:        job.Executor,
 			Partition:       i,
 			Status:          protocol.TaskStatusIdle,
 			Version:         uuid.New().String(),

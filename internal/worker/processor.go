@@ -42,8 +42,15 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 
 	log.Printf("[WORKER:%s] Map emitted %d key-value pairs", workerID, len(emitted))
 
+	// Apply combine phase to reduce intermediate data before partitioning
+	combined, err := toyreduce.CombinePhase(emitted, p.worker)
+	if err != nil {
+		return fmt.Errorf("combine error: %w", err)
+	}
+	log.Printf("[WORKER:%s] Combine reduced to %d key-value pairs", workerID, len(combined))
+
 	// Partition the output
-	partitioned := PartitionMapOutput(emitted, task.NumPartitions)
+	partitioned := PartitionMapOutput(combined, task.NumPartitions)
 
 	// Store each partition locally
 	for partition, kvs := range partitioned {

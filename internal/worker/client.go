@@ -23,7 +23,9 @@ type Client struct {
 func NewClient(masterURL string) *Client {
 	return &Client{
 		masterURL: masterURL,
-		http:      &http.Client{},
+		http: &http.Client{
+			Timeout: 20 * time.Second, // 20s chosen to accommodate potentially large data transfers and network variability; based on expected operation duration in typical deployments.
+		},
 	}
 }
 

@@ -213,6 +213,51 @@
 		const interval = setInterval(fetchJobs, 5000);
 		return () => clearInterval(interval);
 	});
+ 
+	// Download results as JSON
+	function downloadJSON() {
+		const filteredResults = $table.getFilteredRowModel().rows.map(row => row.original);
+		const dataStr = JSON.stringify(filteredResults, null, 2);
+		const blob = new Blob([dataStr], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `results-${selectedJobId?.slice(0, 8)}.json`;
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	}
+
+	// Download results as CSV
+	function downloadCSV() {
+		const filteredResults = $table.getFilteredRowModel().rows.map(row => row.original);
+
+		// CSV header
+		let csv = 'Key,Value\n';
+
+		// CSV rows
+		for (const result of filteredResults) {
+			// Escape values that contain commas or quotes
+			const key = result.key.includes(',') || result.key.includes('"')
+				? `"${result.key.replace(/"/g, '""')}"`
+				: result.key;
+			const value = result.value.includes(',') || result.value.includes('"')
+				? `"${result.value.replace(/"/g, '""')}"`
+				: result.value;
+			csv += `${key},${value}\n`;
+		}
+
+		const blob = new Blob([csv], { type: 'text/csv' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `results-${selectedJobId?.slice(0, 8)}.csv`;
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	}
 </script>
 
 <div class="space-y-6">
@@ -301,6 +346,20 @@
 						<h2 class="text-lg font-semibold text-[var(--fg)]">
 							Results for {selectedJobId.slice(0, 8)}
 						</h2>
+						<div class="flex gap-2">
+							<button
+								onclick={downloadJSON}
+								class="border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--fg)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+							>
+								Download JSON
+							</button>
+							<button
+								onclick={downloadCSV}
+								class="border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--fg)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+							>
+								Download CSV
+							</button>
+						</div>
 					</div>
 
 					<!-- Search -->

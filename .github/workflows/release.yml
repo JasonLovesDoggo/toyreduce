@@ -1,0 +1,143 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Build UI
+        run: |
+          cd ui
+          pnpm install
+          pnpm run publish
+          cd ..
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Generate version
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="v0.0.0-${SHORT_SHA}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build -o dist/toyreduce-linux-amd64 ./cmd/toyreduce
+
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 go build -o dist/toyreduce-linux-arm64 ./cmd/toyreduce
+
+          # macOS AMD64
+          GOOS=darwin GOARCH=amd64 go build -o dist/toyreduce-darwin-amd64 ./cmd/toyreduce
+
+          # macOS ARM64 (Apple Silicon)
+          GOOS=darwin GOARCH=arm64 go build -o dist/toyreduce-darwin-arm64 ./cmd/toyreduce
+
+          # Windows AMD64
+          GOOS=windows GOARCH=amd64 go build -o dist/toyreduce-windows-amd64.exe ./cmd/toyreduce
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Installation
+
+          Download the appropriate binary for your platform:
+
+          | Platform | Architecture | Download |
+          |----------|--------------|----------|
+          | Linux | AMD64 | `toyreduce-linux-amd64` |
+          | Linux | ARM64 | `toyreduce-linux-arm64` |
+          | macOS | Intel | `toyreduce-darwin-amd64` |
+          | macOS | Apple Silicon | `toyreduce-darwin-arm64` |
+          | Windows | AMD64 | `toyreduce-windows-amd64.exe` |
+
+          ### Quick Start
+
+          ```bash
+          # Linux/macOS: Download and make executable
+          chmod +x toyreduce-*
+          ./toyreduce-* --help
+
+          # Or move to your PATH
+          sudo mv toyreduce-* /usr/local/bin/toyreduce
+          ```
+
+          ## Changes
+
+          EOF
+
+          # Add commit messages since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            git log --pretty=format:"- %s (%h)" -10 >> release_notes.md
+          else
+            git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" >> release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Checksums (SHA256)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo '```' >> release_notes.md
+          cat dist/checksums.txt >> release_notes.md
+          echo '```' >> release_notes.md
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.version.outputs.version }} \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --notes-file release_notes.md \
+            dist/*

@@ -167,7 +167,7 @@
 		{#if activeTab === 'jobs'}
 			<div class="space-y-8">
 				<WorkerStatus {workers} />
-				<JobSubmitForm onSubmit={handleJobSubmit} />
+				<JobSubmitForm onSubmit={handleJobSubmit} executors={config.executors} />
 				<JobList
 					{jobs}
 					onCancel={handleJobCancel}

@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
+	"pkg.jsn.cam/toyreduce/pkg/executors"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
-	"pkg.jsn.cam/toyreduce/pkg/workers"
 )
 
 // Config holds worker configuration
@@ -83,7 +82,7 @@ func (n *Node) Start() error {
 	log.Printf("[WORKER:%s] Data server started at %s", n.id, dataEndpoint)
 
 	// Collect available executors
-	executors := workers.ListExecutors()
+	executors := executors.ListExecutors()
 	log.Printf("[WORKER:%s] Available executors: %v", n.id, executors)
 
 	// Register with master (include data endpoint)
@@ -108,7 +107,7 @@ func (n *Node) Start() error {
 func (n *Node) taskLoop() {
 	pollInterval := n.config.PollInterval
 	if pollInterval == 0 {
-		pollInterval = 2 * time.Second
+		pollInterval = 500 * time.Millisecond
 	}
 
 	for {
@@ -127,18 +126,16 @@ func (n *Node) taskLoop() {
 			time.Sleep(pollInterval)
 
 		case protocol.TaskTypeMap:
-			// Get worker implementation for this task's executor
-			// The executor info is now embedded in the task (from current job)
-			// For now, we'll instantiate processor per task when we have multi-job support
-			// Currently using the old single-job approach
-			if n.processor == nil {
-				// Lazy initialization (for backwards compat during refactor)
-				worker := getWorkerByName("wordcount") // FIXME: get from task
-				if worker == nil {
-					log.Printf("[WORKER:%s] No worker implementation available", n.id)
-					time.Sleep(pollInterval)
-					continue
-				}
+			// Get worker implementation from task's executor field
+			worker := executors.GetExecutor(task.MapTask.Executor)
+			if worker == nil {
+				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.MapTask.Executor)
+				time.Sleep(pollInterval)
+				continue
+			}
+
+			// Create processor for this executor (supports different executors per task)
+			if n.processor == nil || n.processor.worker != worker {
 				n.processor = NewProcessor(worker, n.client, n.storage)
 			}
 
@@ -149,6 +146,19 @@ func (n *Node) taskLoop() {
 			}
 
 		case protocol.TaskTypeReduce:
+			// Get worker implementation from task's executor field
+			worker := executors.GetExecutor(task.ReduceTask.Executor)
+			if worker == nil {
+				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.ReduceTask.Executor)
+				time.Sleep(pollInterval)
+				continue
+			}
+
+			// Create processor for this executor (supports different executors per task)
+			if n.processor == nil || n.processor.worker != worker {
+				n.processor = NewProcessor(worker, n.client, n.storage)
+			}
+
 			if err := n.processor.ProcessReduceTask(task.ReduceTask, n.id); err != nil {
 				log.Printf("[WORKER:%s] Reduce task failed: %v", n.id, err)
 				// Notify master of failure
@@ -194,19 +204,14 @@ func (n *Node) heartbeatLoop() {
 
 // reregister attempts to re-register with the master
 func (n *Node) reregister() error {
-	executors := workers.ListExecutors()
+	executorOptions := executors.ListExecutors()
 	dataEndpoint := n.server.GetEndpoint()
 
-	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executors, dataEndpoint)
+	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executorOptions, dataEndpoint)
 	if err != nil {
 		return fmt.Errorf("registration failed: %w", err)
 	}
 
 	log.Printf("[WORKER:%s] Re-registered with master (store: %s)", n.id, regResp.StoreURL)
 	return nil
-}
-
-// getWorkerByName returns the worker implementation by name from the global registry
-func getWorkerByName(name string) toyreduce.Worker {
-	return workers.GetWorker(name)
 }

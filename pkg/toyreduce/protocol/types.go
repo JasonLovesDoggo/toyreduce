@@ -29,6 +29,7 @@ const (
 type MapTask struct {
 	ID            string     `json:"id"`
 	JobID         string     `json:"job_id"`
+	Executor      string     `json:"executor"` // executor name for this task
 	Chunk         []string   `json:"chunk"`
 	Status        TaskStatus `json:"status"`
 	WorkerID      string     `json:"worker_id"`
@@ -43,6 +44,7 @@ type MapTask struct {
 type ReduceTask struct {
 	ID              string     `json:"id"`
 	JobID           string     `json:"job_id"`
+	Executor        string     `json:"executor"` // executor name for this task
 	Partition       int        `json:"partition"`
 	Status          TaskStatus `json:"status"`
 	WorkerID        string     `json:"worker_id"`

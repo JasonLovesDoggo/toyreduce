@@ -69,8 +69,11 @@ type Worker interface {
 }
 ```
 
-**Examples:**
-- [wordcount](pkg/workers/wordcount/impl.go) - Count word frequencies in text files
-- [actioncount](pkg/workers/actioncount/impl.go) - Count action types in log files
+**Built-in Executors:**
+- [wordcount](pkg/executors/wordcount/impl.go) - Count word frequencies in text files
+- [actioncount](pkg/executors/actioncount/impl.go) - Count action types in log files (format: `user_123 did login`)
+- [maxvalue](pkg/executors/maxvalue/impl.go) - Find maximum value per metric key (format: `cpu_usage:75.23`)
+- [urldedup](pkg/executors/urldedup/impl.go) - Deduplicate URLs (one unique URL per line)
+- [average](pkg/executors/average/impl.go) - Calculate average value per metric key (format: `temperature:23.5`)
 
 Register your executor in [pkg/workers/map.go](pkg/workers/map.go) and it will be available in the CLI and web UI.

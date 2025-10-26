@@ -78,12 +78,20 @@ func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
 func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
 	var all []KeyValue
 	for chunk := range chunks {
+		var chunkOutput []KeyValue
 		err := worker.Map(chunk, func(kv KeyValue) {
-			all = append(all, kv)
+			chunkOutput = append(chunkOutput, kv)
 		})
 		if err != nil {
 			return nil, err
 		}
+
+		// Apply combine phase to this chunk's output to reduce intermediate data
+		combined, err := CombinePhase(chunkOutput, worker)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, combined...)
 	}
 	return all, nil
 }
@@ -94,6 +102,45 @@ func Shuffle(pairs []KeyValue) map[string][]string {
 		grouped[kv.Key] = append(grouped[kv.Key], kv.Value)
 	}
 	return grouped
+}
+
+// CombinePhase applies local aggregation to reduce intermediate data.
+// Execution order:
+// 1. Worker implements DisableCombiner() returning true → skip combining
+// 2. Otherwise, if Worker implements CombinableWorker with Combine() → use custom logic
+// 3. Otherwise, use the worker's Reduce() function as combiner
+func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
+	// Check if worker opts-out of combining
+	if disabler, ok := worker.(DisableCombinerCheck); ok {
+		if disabler.DisableCombiner() {
+			return pairs, nil // Skip combining
+		}
+	}
+
+	// Shuffle pairs locally by key
+	grouped := Shuffle(pairs)
+
+	// Combine using appropriate function
+	var combined []KeyValue
+	emitter := func(kv KeyValue) {
+		combined = append(combined, kv)
+	}
+
+	for key, values := range grouped {
+		// Check if worker has custom Combine() method
+		if combinable, ok := worker.(CombinableWorker); ok {
+			if err := combinable.Combine(key, values, emitter); err != nil {
+				return nil, err
+			}
+		} else {
+			// Default: use Reduce() for combining
+			if err := worker.Reduce(key, values, emitter); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return combined, nil
 }
 
 func ReducePhase(groups map[string][]string, worker Worker) []KeyValue {

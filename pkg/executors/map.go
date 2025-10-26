@@ -1,21 +1,29 @@
-package workers
+package executors
 
 import (
+	"sort"
+
+	"pkg.jsn.cam/toyreduce/pkg/executors/actioncount"
+	"pkg.jsn.cam/toyreduce/pkg/executors/average"
+	"pkg.jsn.cam/toyreduce/pkg/executors/maxvalue"
+	"pkg.jsn.cam/toyreduce/pkg/executors/urldedup"
+	"pkg.jsn.cam/toyreduce/pkg/executors/wordcount"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
-	"pkg.jsn.cam/toyreduce/pkg/workers/actioncount"
-	"pkg.jsn.cam/toyreduce/pkg/workers/wordcount"
 )
 
 var Executors = map[string]toyreduce.Worker{
 	"wordcount":   wordcount.WordCountWorker{},
 	"actioncount": actioncount.ActionCountWorker{},
+	"maxvalue":    maxvalue.MaxValueWorker{},
+	"urldedup":    urldedup.URLDedupWorker{},
+	"average":     average.AverageWorker{},
 }
 
 func IsValidExecutor(name string) bool {
 	_, exists := Executors[name]
 	return exists
 }
-func GetWorker(name string) toyreduce.Worker {
+func GetExecutor(name string) toyreduce.Worker {
 	return Executors[name]
 }
 
@@ -24,6 +32,7 @@ func ListExecutors() []string {
 	for name := range Executors {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 

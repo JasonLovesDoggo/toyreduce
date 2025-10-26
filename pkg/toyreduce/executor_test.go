@@ -7,6 +7,7 @@ import (
 
 func TestChunk(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name           string
 		fileContent    string
@@ -147,6 +148,7 @@ func TestChunk_LargeFile(t *testing.T) {
 
 func TestChunk_NonexistentFile(t *testing.T) {
 	t.Parallel()
+
 	out := make(chan []string, 1)
 
 	err := Chunk("/nonexistent/path/file.txt", 1, out)
@@ -163,6 +165,7 @@ func TestChunk_NonexistentFile(t *testing.T) {
 
 func TestShuffle(t *testing.T) {
 	t.Parallel()
+
 	tests := []struct {
 		name  string
 		pairs []KeyValue
@@ -212,6 +215,7 @@ func TestShuffle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			got := Shuffle(tt.pairs)
 
 			// Check all expected keys

@@ -22,6 +22,7 @@ func createTestMaster() *Master {
 
 func TestGetNextTask_NoJob(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	task := m.GetNextTask("worker-1")
@@ -33,6 +34,7 @@ func TestGetNextTask_NoJob(t *testing.T) {
 
 func TestGetNextTask_MapTask(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup a job with map tasks
@@ -93,6 +95,7 @@ func TestGetNextTask_MapTask(t *testing.T) {
 
 func TestGetNextTask_ReduceTask(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup a job in reduce phase (all map tasks done)
@@ -144,6 +147,7 @@ func TestGetNextTask_ReduceTask(t *testing.T) {
 
 func TestGetNextTask_NoIdleTasks(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup a job where all tasks are already assigned
@@ -176,6 +180,7 @@ func TestGetNextTask_NoIdleTasks(t *testing.T) {
 
 func TestCompleteMapTask_Success(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup job with map task
@@ -243,6 +248,7 @@ func TestCompleteMapTask_Success(t *testing.T) {
 
 func TestCompleteMapTask_Failure(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup job with map task
@@ -298,6 +304,7 @@ func TestCompleteMapTask_Failure(t *testing.T) {
 
 func TestCompleteMapTask_VersionMismatch(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup job with map task
@@ -338,6 +345,7 @@ func TestCompleteMapTask_VersionMismatch(t *testing.T) {
 
 func TestCompleteMapTask_MaxRetries(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup job with task that has already retried twice
@@ -381,6 +389,7 @@ func TestCompleteMapTask_MaxRetries(t *testing.T) {
 
 func TestCompleteReduceTask_Success(t *testing.T) {
 	t.Parallel()
+
 	m := createTestMaster()
 
 	// Setup job with reduce task

@@ -87,6 +87,7 @@ func TestBasicWordCount(t *testing.T) {
 // TestEmptyFile tests MapReduce with an empty input file
 func TestEmptyFile(t *testing.T) {
 	t.Parallel()
+
 	tmpfile, err := os.CreateTemp(t.TempDir(), "empty-test-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
@@ -122,10 +123,12 @@ func TestEmptyFile(t *testing.T) {
 // TestSingleLine tests MapReduce with a single line
 func TestSingleLine(t *testing.T) {
 	t.Parallel()
+
 	tmpfile, err := os.CreateTemp(t.TempDir(), "single-line-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
+
 	defer os.Remove(tmpfile.Name())
 
 	if _, err := tmpfile.WriteString("hello\n"); err != nil {
@@ -168,10 +171,12 @@ func TestSingleLine(t *testing.T) {
 // TestLargeInput tests MapReduce with multiple chunks
 func TestLargeInput(t *testing.T) {
 	t.Parallel()
+
 	tmpfile, err := os.CreateTemp(t.TempDir(), "large-input-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
+
 	defer os.Remove(tmpfile.Name())
 
 	// Write enough data to create multiple chunks

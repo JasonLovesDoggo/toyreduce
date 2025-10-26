@@ -472,6 +472,7 @@ func (m *Master) GetConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"store_url":         m.storeURL,
 		"heartbeat_timeout": m.heartbeatTimeout.String(),
+		"executors":         executors.ListExecutors(),
 	}
 }
 

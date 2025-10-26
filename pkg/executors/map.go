@@ -1,6 +1,8 @@
 package executors
 
 import (
+	"sort"
+
 	"pkg.jsn.cam/toyreduce/pkg/executors/actioncount"
 	"pkg.jsn.cam/toyreduce/pkg/executors/average"
 	"pkg.jsn.cam/toyreduce/pkg/executors/maxvalue"
@@ -30,6 +32,7 @@ func ListExecutors() []string {
 	for name := range Executors {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 

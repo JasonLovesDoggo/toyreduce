@@ -6,11 +6,12 @@
 			chunk_size: number;
 			reduce_tasks: number;
 		}) => void;
+		executors: string[];
 	}
 
-	let { onSubmit }: Props = $props();
+	let { onSubmit, executors }: Props = $props();
 
-	let executor = $state('wordcount');
+	let executor = $state(executors[0]);
 	let inputPath = $state('');
 	let chunkSize = $state(16); // Default 16MB
 	let reduceTasks = $state(4);
@@ -55,8 +56,9 @@
 					class="w-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--fg)] focus:border-[var(--accent)] focus:outline-none"
 					required
 				>
-					<option value="wordcount">wordcount</option>
-					<option value="actioncount">actioncount</option>
+					{#each executors as exec}
+						<option value={exec}>{exec}</option>
+					{/each}
 				</select>
 			</div>
 

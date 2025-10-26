@@ -105,9 +105,10 @@ func Shuffle(pairs []KeyValue) map[string][]string {
 }
 
 // CombinePhase applies local aggregation to reduce intermediate data.
-// By default, uses the worker's Reduce() function unless:
-// - Worker implements DisableCombiner() returning true (skip combining)
-// - Worker implements CombinableWorker with Combine() (use custom logic)
+// Execution order:
+// 1. Worker implements DisableCombiner() returning true → skip combining
+// 2. Otherwise, if Worker implements CombinableWorker with Combine() → use custom logic
+// 3. Otherwise, use the worker's Reduce() function as combiner
 func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
 	// Check if worker opts-out of combining
 	if disabler, ok := worker.(DisableCombinerCheck); ok {

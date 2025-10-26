@@ -53,6 +53,7 @@ type Master struct {
 
 	// Async heartbeat processing
 	heartbeatChan chan string
+	shutdownChan  chan struct{}
 
 	mu sync.RWMutex
 }
@@ -95,6 +96,7 @@ func NewMaster(cfg Config) (*Master, error) {
 		jobQueue:         []string{},
 		workers:          make(map[string]*WorkerInfo),
 		heartbeatChan:    make(chan string, 100), // Buffered to prevent blocking
+		shutdownChan:     make(chan struct{}),
 	}
 
 	// Start async heartbeat processor
@@ -310,12 +312,25 @@ func (m *Master) UpdateHeartbeat(workerID string) bool {
 
 // processHeartbeats processes heartbeat updates asynchronously
 func (m *Master) processHeartbeats() {
-	for workerID := range m.heartbeatChan {
-		m.mu.Lock()
-		if worker, exists := m.workers[workerID]; exists {
-			worker.LastHeartbeat = time.Now()
+	for {
+		select {
+		case workerID := <-m.heartbeatChan:
+			m.mu.Lock()
+			if worker, exists := m.workers[workerID]; exists {
+				worker.LastHeartbeat = time.Now()
+			}
+			m.mu.Unlock()
+		case <-m.shutdownChan:
+			return
 		}
-		m.mu.Unlock()
+	}
+}
+
+// Shutdown gracefully shuts down the master and closes goroutines
+func (m *Master) Shutdown() {
+	close(m.shutdownChan)
+	if m.storage != nil {
+		m.storage.Close()
 	}
 }
 

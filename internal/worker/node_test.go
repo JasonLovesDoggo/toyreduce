@@ -10,6 +10,7 @@ import (
 
 // TestGetExecutor verifies that executors.GetExecutor returns correct executors
 func TestGetExecutor(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		executor string
@@ -49,6 +50,7 @@ func TestGetExecutor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			worker := executors.GetExecutor(tt.executor)
 			if tt.wantNil && worker != nil {
 				t.Errorf("executors.GetExecutor(%q) = %v, want nil", tt.executor, worker)
@@ -63,6 +65,7 @@ func TestGetExecutor(t *testing.T) {
 
 // TestDynamicExecutorHandling tests that workers can handle different executors dynamically
 func TestDynamicExecutorHandling(t *testing.T) {
+	t.Parallel()
 	// Create a mock node with a processor
 	node := &Node{
 		id: "test-worker",
@@ -101,6 +104,7 @@ func TestDynamicExecutorHandling(t *testing.T) {
 
 // TestTaskExecutorField verifies that MapTask and ReduceTask have Executor field
 func TestTaskExecutorField(t *testing.T) {
+	t.Parallel()
 	// Test MapTask has Executor field
 	mapTask := &protocol.MapTask{
 		ID:       "test-map-task",
@@ -126,6 +130,7 @@ func TestTaskExecutorField(t *testing.T) {
 
 // TestProcessorWorkerAccess tests that we can access the worker field in Processor
 func TestProcessorWorkerAccess(t *testing.T) {
+	t.Parallel()
 	worker := executors.GetExecutor("wordcount")
 	if worker == nil {
 		t.Fatal("wordcount executor not found")
@@ -146,6 +151,7 @@ func TestProcessorWorkerAccess(t *testing.T) {
 
 // TestMultipleExecutorSwitching simulates a worker handling multiple jobs with different executors
 func TestMultipleExecutorSwitching(t *testing.T) {
+	t.Parallel()
 	node := &Node{
 		id: "test-worker",
 	}
@@ -172,6 +178,7 @@ func TestMultipleExecutorSwitching(t *testing.T) {
 
 // TestWorkerComparisonForExecutorChange tests the logic that determines if processor needs recreation
 func TestWorkerComparisonForExecutorChange(t *testing.T) {
+	t.Parallel()
 	node := &Node{
 		id: "test-worker",
 	}
@@ -214,6 +221,7 @@ func (w *mockWorker) Description() string {
 
 // TestProcessorRecreationWithMockWorkers tests processor recreation with mock workers
 func TestProcessorRecreationWithMockWorkers(t *testing.T) {
+	t.Parallel()
 	node := &Node{
 		id: "test-worker",
 	}

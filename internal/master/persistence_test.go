@@ -11,6 +11,7 @@ import (
 // are not restarted after master restart, even if the persisted queue
 // contains stale data with completed job IDs.
 func TestRestoreQueueIgnoresStaleStorage(t *testing.T) {
+	t.Parallel()
 	// Setup: Use MemoryBackend and pre-populate it
 	backend := storage.NewMemoryBackend()
 

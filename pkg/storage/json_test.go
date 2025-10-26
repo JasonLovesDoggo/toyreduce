@@ -10,7 +10,9 @@ type testStruct struct {
 }
 
 func TestJSONStore(t *testing.T) {
+	t.Parallel()
 	t.Run("PutAndGetJSON", func(t *testing.T) {
+		t.Parallel()
 		backend := NewMemoryBackend()
 
 		store := NewJSONStore(backend)
@@ -40,6 +42,7 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("GetJSONNonExistent", func(t *testing.T) {
+		t.Parallel()
 		backend := NewMemoryBackend()
 
 		store := NewJSONStore(backend)
@@ -60,6 +63,7 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("JSONArray", func(t *testing.T) {
+		t.Parallel()
 		backend := NewMemoryBackend()
 
 		store := NewJSONStore(backend)
@@ -92,6 +96,7 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("JSONMap", func(t *testing.T) {
+		t.Parallel()
 		backend := NewMemoryBackend()
 
 		store := NewJSONStore(backend)
@@ -128,6 +133,7 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
+		t.Parallel()
 		backend := NewMemoryBackend()
 
 		store := NewJSONStore(backend)
@@ -154,6 +160,7 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("Transaction", func(t *testing.T) {
+		t.Parallel()
 		backend := NewMemoryBackend()
 
 		store := NewJSONStore(backend)
@@ -209,7 +216,9 @@ func TestJSONStore(t *testing.T) {
 }
 
 func TestEncodeDecodeJSON(t *testing.T) {
+	t.Parallel()
 	t.Run("EncodeJSON", func(t *testing.T) {
+		t.Parallel()
 		original := testStruct{Name: "test", Value: 42}
 
 		data, err := EncodeJSON(original)
@@ -223,6 +232,7 @@ func TestEncodeDecodeJSON(t *testing.T) {
 	})
 
 	t.Run("DecodeJSON", func(t *testing.T) {
+		t.Parallel()
 		original := testStruct{Name: "test", Value: 42}
 		data, _ := EncodeJSON(original)
 
@@ -237,6 +247,7 @@ func TestEncodeDecodeJSON(t *testing.T) {
 	})
 
 	t.Run("DecodeJSONInvalidData", func(t *testing.T) {
+		t.Parallel()
 		var got testStruct
 
 		err := DecodeJSON([]byte("invalid json"), &got)

@@ -23,6 +23,7 @@ func createTestServer() *Server {
 }
 
 func TestHandleJobSubmit(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	submitReq := protocol.JobSubmitRequest{
@@ -59,6 +60,7 @@ func TestHandleJobSubmit(t *testing.T) {
 }
 
 func TestHandleJobSubmit_InvalidExecutor(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	submitReq := protocol.JobSubmitRequest{
@@ -82,6 +84,7 @@ func TestHandleJobSubmit_InvalidExecutor(t *testing.T) {
 }
 
 func TestHandleJobStatus(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	// Create a job first
@@ -116,6 +119,7 @@ func TestHandleJobStatus(t *testing.T) {
 }
 
 func TestHandleJobStatus_NotFound(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/jobs/nonexistent", nil)
@@ -129,6 +133,7 @@ func TestHandleJobStatus_NotFound(t *testing.T) {
 }
 
 func TestHandleWorkerRegistration(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	regReq := protocol.WorkerRegistrationRequest{
@@ -178,6 +183,7 @@ func TestHandleWorkerRegistration(t *testing.T) {
 }
 
 func TestHandleGetNextTask_NoJob(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/next?workerID=worker-1", nil)
@@ -200,6 +206,7 @@ func TestHandleGetNextTask_NoJob(t *testing.T) {
 }
 
 func TestHandleGetNextTask_WithMapTask(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	// Setup a job with map tasks
@@ -254,6 +261,7 @@ func TestHandleGetNextTask_WithMapTask(t *testing.T) {
 }
 
 func TestHandleJobList(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	// Add some jobs
@@ -288,6 +296,7 @@ func TestHandleJobList(t *testing.T) {
 }
 
 func TestHandleWorkerList(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	// Register some workers
@@ -327,6 +336,7 @@ func TestHandleWorkerList(t *testing.T) {
 }
 
 func TestHandleHealth(t *testing.T) {
+	t.Parallel()
 	server := createTestServer()
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)

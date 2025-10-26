@@ -53,6 +53,7 @@ func (m *Master) restore() error {
 	if err != nil {
 		return err
 	}
+
 	m.jobs = jobs
 	log.Printf("[MASTER] Restored %d jobs", len(jobs))
 
@@ -76,10 +77,12 @@ func (m *Master) restore() error {
 			log.Printf("[MASTER] Warning: Executor not found for job %s: %s", jobID, job.Executor)
 			continue
 		}
+
 		state.worker = worker
 
 		m.jobStates[jobID] = state
 	}
+
 	log.Printf("[MASTER] Restored %d job states", len(m.jobStates))
 
 	// Rebuild queue from job statuses (source of truth)
@@ -90,6 +93,7 @@ func (m *Master) restore() error {
 			m.jobQueue = append(m.jobQueue, jobID)
 		}
 	}
+
 	log.Printf("[MASTER] Rebuilt queue with %d queued jobs", len(m.jobQueue))
 
 	// Load current job ID
@@ -97,6 +101,7 @@ func (m *Master) restore() error {
 	if err != nil {
 		return err
 	}
+
 	m.currentJobID = currentJobID
 
 	// Handle resume logic for running job
@@ -110,6 +115,7 @@ func (m *Master) restore() error {
 	m.startNextJobIfReady()
 
 	log.Printf("[MASTER] State restore complete")
+
 	return nil
 }
 
@@ -124,9 +130,11 @@ func (m *Master) resumeCurrentJob() error {
 	if !exists {
 		// No state, mark job as failed
 		log.Printf("[MASTER] Job %s has no state, marking as failed", m.currentJobID)
+
 		job.Status = protocol.JobStatusFailed
 		job.Error = "Master restarted with no job state"
 		m.currentJobID = ""
+
 		return nil
 	}
 
@@ -174,6 +182,7 @@ func (m *Master) resumeCurrentJob() error {
 	// Check if job is actually complete
 	if m.isJobComplete(job, state) {
 		log.Printf("[MASTER] Job %s is actually complete, marking as such", m.currentJobID)
+
 		job.Status = protocol.JobStatusCompleted
 		m.currentJobID = ""
 	}
@@ -186,5 +195,6 @@ func (m *Master) Close() error {
 	if m.storage != nil {
 		return m.storage.Close()
 	}
+
 	return nil
 }

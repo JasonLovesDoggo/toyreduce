@@ -112,6 +112,7 @@ func (s *MasterStorage) SaveJob(job *protocol.Job) error {
 	if err != nil {
 		return err
 	}
+
 	return storage.PutString(s.backend, jobsBucket, job.ID, data)
 }
 
@@ -125,7 +126,9 @@ func (s *MasterStorage) LoadJobs() (map[string]*protocol.Job, error) {
 			log.Printf("[STORAGE] Warning: Failed to decode job %s: %v", k, err)
 			return nil // Skip corrupted jobs
 		}
+
 		jobs[job.ID] = &job
+
 		return nil
 	})
 
@@ -143,6 +146,7 @@ func (s *MasterStorage) SaveJobState(jobID string, state *JobState) error {
 	if err != nil {
 		return err
 	}
+
 	return storage.PutString(s.backend, jobStatesBucket, jobID, data)
 }
 
@@ -156,7 +160,9 @@ func (s *MasterStorage) LoadJobStates() (map[string]*JobState, error) {
 			log.Printf("[STORAGE] Warning: Failed to decode job state %s: %v", k, err)
 			return nil // Skip corrupted states
 		}
+
 		states[string(k)] = &state
+
 		return nil
 	})
 
@@ -174,6 +180,7 @@ func (s *MasterStorage) SaveQueue(queue []string) error {
 	if err != nil {
 		return err
 	}
+
 	return storage.PutString(s.backend, queueBucket, "queue", data)
 }
 
@@ -185,6 +192,7 @@ func (s *MasterStorage) LoadQueue() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if data == nil {
 		return []string{}, nil // No queue stored
 	}
@@ -207,9 +215,11 @@ func (s *MasterStorage) LoadCurrentJobID() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if data == nil {
 		return "", nil // No current job
 	}
+
 	return string(data), nil
 }
 
@@ -222,5 +232,6 @@ func (s *MasterStorage) Close() error {
 func NewNoOpStorage() Storage {
 	backend := storage.NewMemoryBackend()
 	ms, _ := NewMasterStorage(backend)
+
 	return ms
 }

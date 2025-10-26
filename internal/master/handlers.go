@@ -39,9 +39,11 @@ func NewServer(cfg Config) (*Server, error) {
 	// Check store health
 	if cfg.StoreURL != "" {
 		log.Printf("[MASTER] Checking store health at %s", cfg.StoreURL)
+
 		if err := s.checkStoreHealth(cfg.StoreURL); err != nil {
 			return nil, fmt.Errorf("store health check failed: %w", err)
 		}
+
 		log.Printf("[MASTER] store is healthy")
 	}
 
@@ -50,6 +52,7 @@ func NewServer(cfg Config) (*Server, error) {
 	if heartbeatTimeout == 0 {
 		heartbeatTimeout = 30 * time.Second
 	}
+
 	master.StartHealthMonitor(heartbeatTimeout)
 
 	return s, nil
@@ -105,6 +108,7 @@ func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request
 			Error:    err.Error(),
 		}
 		httpx.JSON(w, http.StatusOK, resp) // Still 200, but Success=false
+
 		return nil
 	}
 
@@ -115,6 +119,7 @@ func (s *Server) handleWorkerRegistration(w http.ResponseWriter, r *http.Request
 	}
 
 	httpx.JSON(w, http.StatusOK, resp)
+
 	return nil
 }
 
@@ -127,6 +132,7 @@ func (s *Server) handleGetNextTask(w http.ResponseWriter, r *http.Request) error
 
 	task := s.master.GetNextTask(workerID)
 	httpx.JSON(w, http.StatusOK, task)
+
 	return nil
 }
 
@@ -146,10 +152,13 @@ func (s *Server) handleTaskCompletion(w http.ResponseWriter, r *http.Request) er
 	}
 
 	// Determine task type by checking both task lists
-	var acknowledged bool
-	var message string
+	var (
+		acknowledged bool
+		message      string
+	)
 
 	// Try map task first
+
 	if s.master.CompleteMapTask(taskID, workerID, req.Version, req.Success, req.Error) {
 		acknowledged = true
 		message = "map task completed"
@@ -166,6 +175,7 @@ func (s *Server) handleTaskCompletion(w http.ResponseWriter, r *http.Request) er
 	}
 
 	httpx.JSON(w, http.StatusOK, resp)
+
 	return nil
 }
 
@@ -182,6 +192,7 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) error {
 
 	resp := protocol.HeartbeatResponse{OK: ok}
 	httpx.JSON(w, http.StatusOK, resp)
+
 	return nil
 }
 
@@ -191,18 +202,21 @@ func (s *Server) handleWorkerList(w http.ResponseWriter, r *http.Request) error 
 	httpx.JSON(w, http.StatusOK, map[string]interface{}{
 		"workers": workers,
 	})
+
 	return nil
 }
 
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) error {
 	config := s.master.GetConfig()
 	httpx.JSON(w, http.StatusOK, config)
+
 	return nil
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) error {
 	status := s.master.GetStatus()
 	httpx.JSON(w, http.StatusOK, status)
+
 	return nil
 }
 
@@ -232,7 +246,9 @@ func (s *Server) handleStoreStats(w http.ResponseWriter, r *http.Request) error 
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
 	}
+
 	httpx.JSON(w, resp.StatusCode, stats)
+
 	return nil
 }
 
@@ -243,13 +259,14 @@ func (s *Server) handleStoreReset(w http.ResponseWriter, r *http.Request) error 
 		return nil
 	}
 
-	req, err := http.NewRequest("POST", storeURL+"/reset", nil)
+	req, err := http.NewRequest(http.MethodPost, storeURL+"/reset", nil)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("store unreachable: %v", err))
@@ -262,7 +279,9 @@ func (s *Server) handleStoreReset(w http.ResponseWriter, r *http.Request) error 
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
 	}
+
 	httpx.JSON(w, resp.StatusCode, result)
+
 	return nil
 }
 
@@ -273,13 +292,14 @@ func (s *Server) handleStoreCompact(w http.ResponseWriter, r *http.Request) erro
 		return nil
 	}
 
-	req, err := http.NewRequest("POST", storeUrl+"/compact", nil)
+	req, err := http.NewRequest(http.MethodPost, storeUrl+"/compact", nil)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		httpx.Error(w, http.StatusServiceUnavailable, fmt.Sprintf("store unreachable: %v", err))
@@ -292,7 +312,9 @@ func (s *Server) handleStoreCompact(w http.ResponseWriter, r *http.Request) erro
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return nil
 	}
+
 	httpx.JSON(w, resp.StatusCode, result)
+
 	return nil
 }
 
@@ -303,6 +325,7 @@ func (s *Server) handleStoreHealthCheck(w http.ResponseWriter, r *http.Request) 
 			"status":  "unconfigured",
 			"healthy": false,
 		})
+
 		return nil
 	}
 
@@ -313,6 +336,7 @@ func (s *Server) handleStoreHealthCheck(w http.ResponseWriter, r *http.Request) 
 			"healthy": false,
 			"error":   err.Error(),
 		})
+
 		return nil
 	}
 
@@ -320,6 +344,7 @@ func (s *Server) handleStoreHealthCheck(w http.ResponseWriter, r *http.Request) 
 		"status":  "healthy",
 		"healthy": true,
 	})
+
 	return nil
 }
 
@@ -337,6 +362,7 @@ func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) error {
 			Message: err.Error(),
 		}
 		httpx.JSON(w, http.StatusBadRequest, resp)
+
 		return nil
 	}
 
@@ -346,6 +372,7 @@ func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	httpx.JSON(w, http.StatusCreated, resp)
+
 	return nil
 }
 
@@ -362,6 +389,7 @@ func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	httpx.JSON(w, http.StatusOK, resp)
+
 	return nil
 }
 
@@ -378,6 +406,7 @@ func (s *Server) handleJobStatus(w http.ResponseWriter, r *http.Request) error {
 	job.ComputeDurations()
 
 	httpx.JSON(w, http.StatusOK, job)
+
 	return nil
 }
 
@@ -391,6 +420,7 @@ func (s *Server) handleJobResults(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	httpx.JSON(w, http.StatusOK, results)
+
 	return nil
 }
 
@@ -404,6 +434,7 @@ func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) error {
 			Message: err.Error(),
 		}
 		httpx.JSON(w, http.StatusBadRequest, resp)
+
 		return nil
 	}
 
@@ -413,6 +444,7 @@ func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	httpx.JSON(w, http.StatusOK, resp)
+
 	return nil
 }
 
@@ -420,6 +452,7 @@ func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) Start(port int) error {
 	addr := ":" + strconv.Itoa(port)
 	log.Printf("[MASTER] Starting master server on %s", addr)
+
 	return http.ListenAndServe(addr, s.mux)
 }
 
@@ -433,6 +466,7 @@ func (s *Server) Close() error {
 	if s.master.storage != nil {
 		return s.master.storage.Close()
 	}
+
 	return nil
 }
 

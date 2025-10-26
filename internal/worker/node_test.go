@@ -53,6 +53,7 @@ func TestGetExecutor(t *testing.T) {
 			if tt.wantNil && worker != nil {
 				t.Errorf("executors.GetExecutor(%q) = %v, want nil", tt.executor, worker)
 			}
+
 			if !tt.wantNil && worker == nil {
 				t.Errorf("executors.GetExecutor(%q) = nil, want non-nil", tt.executor)
 			}
@@ -74,6 +75,7 @@ func TestDynamicExecutorHandling(t *testing.T) {
 	if wordcountWorker == nil {
 		t.Fatal("wordcount executor not found")
 	}
+
 	if actioncountWorker == nil {
 		t.Fatal("actioncount executor not found")
 	}
@@ -180,6 +182,7 @@ func TestWorkerComparisonForExecutorChange(t *testing.T) {
 
 	// Different executor - should need recreation
 	worker3 := executors.GetExecutor("actioncount")
+
 	shouldRecreate := node.processor.worker != worker3
 	if !shouldRecreate {
 		t.Error("Worker instance should be different for different executor")

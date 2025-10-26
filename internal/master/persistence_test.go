@@ -13,6 +13,7 @@ import (
 func TestRestoreQueueIgnoresStaleStorage(t *testing.T) {
 	// Setup: Use MemoryBackend and pre-populate it
 	backend := storage.NewMemoryBackend()
+
 	masterStorage, err := NewMasterStorage(backend)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
@@ -34,6 +35,7 @@ func TestRestoreQueueIgnoresStaleStorage(t *testing.T) {
 	for _, job := range jobs {
 		masterStorage.SaveJob(job)
 	}
+
 	masterStorage.SaveQueue([]string{"completed-job", "queued-job"}) // STALE QUEUE
 	masterStorage.SaveCurrentJobID("fake-running-job")               // fake current job
 

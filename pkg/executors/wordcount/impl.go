@@ -17,6 +17,7 @@ func (w WordCountWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 			emit(toyreduce.KeyValue{Key: word, Value: "1"})
 		}
 	}
+
 	return nil
 }
 

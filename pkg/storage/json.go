@@ -26,6 +26,7 @@ func (j *JSONStore) PutJSON(bucket, key []byte, v interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode JSON: %w", err)
 	}
+
 	return j.backend.Put(bucket, key, data)
 }
 
@@ -35,12 +36,15 @@ func (j *JSONStore) GetJSON(bucket, key []byte, v interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	if data == nil {
 		return nil // Key not found, don't decode
 	}
+
 	if err := json.Unmarshal(data, v); err != nil {
 		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
+
 	return nil
 }
 
@@ -87,6 +91,7 @@ func EncodeJSON(v interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode JSON: %w", err)
 	}
+
 	return data, nil
 }
 
@@ -95,5 +100,6 @@ func DecodeJSON(data []byte, v interface{}) error {
 	if err := json.Unmarshal(data, v); err != nil {
 		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
+
 	return nil
 }

@@ -102,6 +102,7 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 
 	// Find the task
 	var task *protocol.MapTask
+
 	for _, t := range state.mapTasks {
 		if t.ID == taskID {
 			task = t
@@ -118,6 +119,7 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 	if task.Version != version {
 		log.Printf("[MASTER] Map task %s version mismatch (expected %s, got %s)",
 			taskID, task.Version, version)
+
 		return false
 	}
 
@@ -134,6 +136,7 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 		state.mapTasksLeft--
 		job.MapTasksDone++
 		job.CompletedTasks++
+
 		log.Printf("[MASTER] Job %s: Map task %s completed by worker %s (%d tasks left)",
 			m.currentJobID, taskID, workerID, state.mapTasksLeft)
 
@@ -142,6 +145,7 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 			if state.mapWorkerEndpoints == nil {
 				state.mapWorkerEndpoints = make(map[string]string)
 			}
+
 			state.mapWorkerEndpoints[taskID] = worker.DataEndpoint
 		}
 
@@ -149,6 +153,7 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 		if err := m.storage.SaveJob(job); err != nil {
 			log.Printf("[MASTER] Warning: Failed to persist job: %v", err)
 		}
+
 		if err := m.storage.SaveJobState(m.currentJobID, state); err != nil {
 			log.Printf("[MASTER] Warning: Failed to persist job state: %v", err)
 		}
@@ -193,6 +198,7 @@ func (m *Master) CompleteReduceTask(taskID, workerID, version string, success bo
 
 	// Find the task
 	var task *protocol.ReduceTask
+
 	for _, t := range state.reduceTasks {
 		if t.ID == taskID {
 			task = t
@@ -209,6 +215,7 @@ func (m *Master) CompleteReduceTask(taskID, workerID, version string, success bo
 	if task.Version != version {
 		log.Printf("[MASTER] Reduce task %s version mismatch (expected %s, got %s)",
 			taskID, task.Version, version)
+
 		return false
 	}
 
@@ -225,6 +232,7 @@ func (m *Master) CompleteReduceTask(taskID, workerID, version string, success bo
 		state.reduceTasksLeft--
 		job.ReduceTasksDone++
 		job.CompletedTasks++
+
 		log.Printf("[MASTER] Job %s: Reduce task %s (partition %d) completed by worker %s (%d tasks left)",
 			m.currentJobID, taskID, task.Partition, workerID, state.reduceTasksLeft)
 
@@ -232,6 +240,7 @@ func (m *Master) CompleteReduceTask(taskID, workerID, version string, success bo
 		if err := m.storage.SaveJob(job); err != nil {
 			log.Printf("[MASTER] Warning: Failed to persist job: %v", err)
 		}
+
 		if err := m.storage.SaveJobState(m.currentJobID, state); err != nil {
 			log.Printf("[MASTER] Warning: Failed to persist job state: %v", err)
 		}

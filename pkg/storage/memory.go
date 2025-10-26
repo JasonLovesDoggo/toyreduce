@@ -27,6 +27,7 @@ func (m *MemoryBackend) CreateBucket(name []byte) error {
 	if _, exists := m.buckets[nameStr]; !exists {
 		m.buckets[nameStr] = make(map[string][]byte)
 	}
+
 	return nil
 }
 
@@ -36,6 +37,7 @@ func (m *MemoryBackend) DeleteBucket(name []byte) error {
 	defer m.mu.Unlock()
 
 	delete(m.buckets, string(name))
+
 	return nil
 }
 
@@ -45,6 +47,7 @@ func (m *MemoryBackend) BucketExists(name []byte) (bool, error) {
 	defer m.mu.RUnlock()
 
 	_, exists := m.buckets[string(name)]
+
 	return exists, nil
 }
 
@@ -54,6 +57,7 @@ func (m *MemoryBackend) Put(bucket, key, value []byte) error {
 	defer m.mu.Unlock()
 
 	bucketStr := string(bucket)
+
 	bkt, exists := m.buckets[bucketStr]
 	if !exists {
 		return fmt.Errorf("bucket not found: %s", bucket)
@@ -63,6 +67,7 @@ func (m *MemoryBackend) Put(bucket, key, value []byte) error {
 	valueCopy := make([]byte, len(value))
 	copy(valueCopy, value)
 	bkt[string(key)] = valueCopy
+
 	return nil
 }
 
@@ -72,6 +77,7 @@ func (m *MemoryBackend) Get(bucket, key []byte) ([]byte, error) {
 	defer m.mu.RUnlock()
 
 	bucketStr := string(bucket)
+
 	bkt, exists := m.buckets[bucketStr]
 	if !exists {
 		return nil, fmt.Errorf("bucket not found: %s", bucket)
@@ -85,6 +91,7 @@ func (m *MemoryBackend) Get(bucket, key []byte) ([]byte, error) {
 	// Return a copy to prevent external modifications
 	valueCopy := make([]byte, len(value))
 	copy(valueCopy, value)
+
 	return valueCopy, nil
 }
 
@@ -94,12 +101,14 @@ func (m *MemoryBackend) Delete(bucket, key []byte) error {
 	defer m.mu.Unlock()
 
 	bucketStr := string(bucket)
+
 	bkt, exists := m.buckets[bucketStr]
 	if !exists {
 		return fmt.Errorf("bucket not found: %s", bucket)
 	}
 
 	delete(bkt, string(key))
+
 	return nil
 }
 
@@ -109,6 +118,7 @@ func (m *MemoryBackend) ForEach(bucket []byte, fn func(k, v []byte) error) error
 	defer m.mu.RUnlock()
 
 	bucketStr := string(bucket)
+
 	bkt, exists := m.buckets[bucketStr]
 	if !exists {
 		return fmt.Errorf("bucket not found: %s", bucket)
@@ -119,6 +129,7 @@ func (m *MemoryBackend) ForEach(bucket []byte, fn func(k, v []byte) error) error
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -158,6 +169,7 @@ func (t *memoryTransaction) Bucket(name []byte) Bucket {
 	if _, exists := t.backend.buckets[bucketStr]; !exists {
 		return nil
 	}
+
 	return &memoryBucket{
 		backend:    t.backend,
 		bucketName: bucketStr,
@@ -173,6 +185,7 @@ func (t *memoryTransaction) ForEachBucket(fn func(name []byte) error) error {
 			return err
 		}
 	}
+
 	return nil
 }
 

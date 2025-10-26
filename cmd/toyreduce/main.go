@@ -83,11 +83,13 @@ func runMasterMode() {
 	log.Printf("Starting ToyReduce master node on port %d", *port)
 	log.Printf("  Store URL: %s", *storeURL)
 	log.Printf("  Heartbeat timeout: %v", *heartbeatTimeout)
+
 	if *dbPath != "" {
 		log.Printf("  Persistence: enabled (%s)", *dbPath)
 	} else {
 		log.Printf("  Persistence: disabled")
 	}
+
 	log.Printf("  Ready to accept job submissions at POST /api/jobs")
 
 	cfg := master2.Config{
@@ -223,11 +225,13 @@ func runCancelJob() {
 
 func listExecutors() {
 	fmt.Println("Available executors:")
+
 	for _, name := range executors.ListExecutors() {
 		desc, err := executors.GetDescription(name)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		fmt.Printf("  %-15s %s\n", name, desc)
 	}
 }

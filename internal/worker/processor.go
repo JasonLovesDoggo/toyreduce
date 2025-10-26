@@ -31,6 +31,7 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 
 	// Collect emitted key-value pairs
 	var emitted []toyreduce.KeyValue
+
 	emitter := func(kv toyreduce.KeyValue) {
 		emitted = append(emitted, kv)
 	}
@@ -47,6 +48,7 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 	if err != nil {
 		return fmt.Errorf("combine error: %w", err)
 	}
+
 	log.Printf("[WORKER:%s] Combine reduced to %d key-value pairs", workerID, len(combined))
 
 	// Partition the output
@@ -57,6 +59,7 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 		if err := p.storage.StorePartition(task.JobID, partition, kvs); err != nil {
 			return fmt.Errorf("store partition %d error: %w", partition, err)
 		}
+
 		log.Printf("[WORKER:%s] Stored %d KVs locally for partition %d", workerID, len(kvs), partition)
 	}
 
@@ -66,6 +69,7 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 	}
 
 	log.Printf("[WORKER:%s] Map task %s completed successfully", workerID, task.ID)
+
 	return nil
 }
 
@@ -76,6 +80,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 
 	// Fetch partition data from all map workers
 	var intermediate []toyreduce.KeyValue
+
 	for _, endpoint := range task.WorkerEndpoints {
 		data, err := p.client.FetchPartitionFromWorker(endpoint, task.JobID, task.Partition)
 		if err != nil {
@@ -83,6 +88,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 			// Continue with other workers - partial data is better than failure
 			continue
 		}
+
 		intermediate = append(intermediate, data...)
 		log.Printf("[WORKER:%s] Fetched %d KVs from %s", workerID, len(data), endpoint)
 	}
@@ -97,6 +103,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 
 	// Collect reduce outputs
 	var results []toyreduce.KeyValue
+
 	emitter := func(kv toyreduce.KeyValue) {
 		results = append(results, kv)
 	}
@@ -121,5 +128,6 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 	}
 
 	log.Printf("[WORKER:%s] Reduce task %s completed successfully", workerID, task.ID)
+
 	return nil
 }

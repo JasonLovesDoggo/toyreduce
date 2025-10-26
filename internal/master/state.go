@@ -2,6 +2,7 @@ package master
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -75,15 +76,19 @@ func NewMaster(cfg Config) (*Master, error) {
 
 	// Initialize storage
 	var storage Storage
+
 	if cfg.DBPath != "" {
 		bboltStorage, err := NewBboltStorage(cfg.DBPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create storage: %w", err)
 		}
+
 		storage = bboltStorage
+
 		log.Printf("[MASTER] Persistence enabled at %s", cfg.DBPath)
 	} else {
 		storage = NewNoOpStorage()
+
 		log.Printf("[MASTER] Persistence disabled (no DBPath configured)")
 	}
 
@@ -108,6 +113,7 @@ func NewMaster(cfg Config) (*Master, error) {
 	}
 
 	log.Printf("[MASTER] Initialized (ready for job submissions)")
+
 	return m, nil
 }
 
@@ -144,6 +150,7 @@ func (m *Master) SubmitJob(req protocol.JobSubmitRequest) (string, error) {
 	if err := m.storage.SaveJob(job); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist job: %v", err)
 	}
+
 	if err := m.storage.SaveQueue(m.jobQueue); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist queue: %v", err)
 	}
@@ -157,7 +164,6 @@ func (m *Master) SubmitJob(req protocol.JobSubmitRequest) (string, error) {
 // startNextJobIfReady starts the next queued job if no job is running
 func (m *Master) startNextJobIfReady() {
 	// Must be called with lock held
-
 	if m.currentJobID != "" {
 		return // Job already running
 	}
@@ -180,6 +186,7 @@ func (m *Master) startNextJobIfReady() {
 	// Initialize job state
 	if err := m.initializeJob(jobID, job); err != nil {
 		log.Printf("[MASTER] Failed to initialize job %s: %v", jobID, err)
+
 		job.Status = protocol.JobStatusFailed
 		job.Error = err.Error()
 		job.CompletedAt = time.Now()
@@ -189,11 +196,13 @@ func (m *Master) startNextJobIfReady() {
 		if err := m.storage.SaveJob(job); err != nil {
 			log.Printf("[MASTER] Warning: Failed to persist failed job: %v", err)
 		}
+
 		if err := m.storage.SaveCurrentJobID(m.currentJobID); err != nil {
 			log.Printf("[MASTER] Warning: Failed to persist current job ID: %v", err)
 		}
 
 		m.startNextJobIfReady() // Try next job
+
 		return
 	}
 
@@ -204,9 +213,11 @@ func (m *Master) startNextJobIfReady() {
 	if err := m.storage.SaveJob(job); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist job: %v", err)
 	}
+
 	if err := m.storage.SaveJobState(jobID, m.jobStates[jobID]); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist job state: %v", err)
 	}
+
 	if err := m.storage.SaveCurrentJobID(m.currentJobID); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist current job ID: %v", err)
 	}
@@ -215,7 +226,6 @@ func (m *Master) startNextJobIfReady() {
 // initializeJob creates the execution state for a job (map tasks, etc)
 func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 	// Must be called with lock held
-
 	// Get worker implementation
 	worker := executors.GetExecutor(job.Executor)
 	if worker == nil {
@@ -224,6 +234,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 
 	// Chunk input file
 	chunks := make(chan []string, 100)
+
 	go func() {
 		if err := toyreduce.Chunk(job.InputPath, job.ChunkSize, chunks); err != nil {
 			log.Printf("[MASTER] Error chunking file for job %s: %v", jobID, err)
@@ -231,6 +242,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 	}()
 
 	var mapTasks []*protocol.MapTask
+
 	for chunk := range chunks {
 		task := &protocol.MapTask{
 			ID:            uuid.New().String(),
@@ -269,6 +281,7 @@ func (m *Master) RegisterWorker(workerID, version string, executors []string, da
 	if err != nil {
 		return fmt.Errorf("version validation error: %w", err)
 	}
+
 	if !compatible {
 		return fmt.Errorf("incompatible version: %s", protocol.GetCompatibilityError(version, protocol.ToyReduceVersion))
 	}
@@ -316,9 +329,11 @@ func (m *Master) processHeartbeats() {
 		select {
 		case workerID := <-m.heartbeatChan:
 			m.mu.Lock()
+
 			if worker, exists := m.workers[workerID]; exists {
 				worker.LastHeartbeat = time.Now()
 			}
+
 			m.mu.Unlock()
 		case <-m.shutdownChan:
 			return
@@ -329,6 +344,7 @@ func (m *Master) processHeartbeats() {
 // Shutdown gracefully shuts down the master and closes goroutines
 func (m *Master) Shutdown() {
 	close(m.shutdownChan)
+
 	if m.storage != nil {
 		m.storage.Close()
 	}
@@ -338,6 +354,7 @@ func (m *Master) Shutdown() {
 func (m *Master) GetJob(jobID string) *protocol.Job {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	return m.jobs[jobID]
 }
 
@@ -350,6 +367,7 @@ func (m *Master) ListJobs() []protocol.Job {
 	for _, job := range m.jobs {
 		jobs = append(jobs, *job)
 	}
+
 	return jobs
 }
 
@@ -368,7 +386,7 @@ func (m *Master) CancelJob(jobID string) error {
 	}
 
 	if job.Status == protocol.JobStatusCancelled {
-		return fmt.Errorf("job already cancelled")
+		return errors.New("job already cancelled")
 	}
 
 	// Mark as cancelled
@@ -393,14 +411,17 @@ func (m *Master) CancelJob(jobID string) error {
 	if err := m.storage.SaveJob(job); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist cancelled job: %v", err)
 	}
+
 	if err := m.storage.SaveQueue(m.jobQueue); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist queue: %v", err)
 	}
+
 	if err := m.storage.SaveCurrentJobID(m.currentJobID); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist current job ID: %v", err)
 	}
 
 	log.Printf("[MASTER] Job cancelled: %s", jobID)
+
 	return nil
 }
 
@@ -543,6 +564,7 @@ func (m *Master) transitionToReducePhase() {
 
 	// Collect unique worker endpoints from completed map tasks
 	workerEndpoints := make([]string, 0)
+
 	seen := make(map[string]bool)
 	for _, endpoint := range state.mapWorkerEndpoints {
 		if !seen[endpoint] {
@@ -554,7 +576,7 @@ func (m *Master) transitionToReducePhase() {
 	log.Printf("[MASTER] Job %s: Collected %d unique worker endpoints for reduce phase", m.currentJobID, len(workerEndpoints))
 
 	// Create reduce tasks (one per partition)
-	for i := 0; i < job.ReduceTasks; i++ {
+	for i := range job.ReduceTasks {
 		task := &protocol.ReduceTask{
 			ID:              uuid.New().String(),
 			JobID:           m.currentJobID,
@@ -574,6 +596,7 @@ func (m *Master) transitionToReducePhase() {
 	if err := m.storage.SaveJob(job); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist job: %v", err)
 	}
+
 	if err := m.storage.SaveJobState(m.currentJobID, state); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist job state: %v", err)
 	}
@@ -616,6 +639,7 @@ func (m *Master) completeJob(jobID string) {
 	if err := m.storage.SaveJob(job); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist completed job: %v", err)
 	}
+
 	if err := m.storage.SaveCurrentJobID(m.currentJobID); err != nil {
 		log.Printf("[MASTER] Warning: Failed to persist current job ID: %v", err)
 	}
@@ -656,7 +680,9 @@ func (m *Master) fetchJobResults(jobID string) {
 
 	// Store results in job
 	m.mu.Lock()
+
 	job.Results = results
+
 	m.mu.Unlock()
 
 	log.Printf("[MASTER] Stored %d results for job %s", len(results), jobID)
@@ -670,14 +696,16 @@ func (m *Master) fetchJobResults(jobID string) {
 // getJobResultsFromStore fetches results for a specific job from the store server
 func (m *Master) getJobResultsFromStore(jobID string) ([]toyreduce.KeyValue, error) {
 	if m.storeURL == "" {
-		return nil, fmt.Errorf("store URL not configured")
+		return nil, errors.New("store URL not configured")
 	}
 
 	url := fmt.Sprintf("%s/results/job/%s", m.storeURL, jobID)
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch results: %w", err)
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -706,11 +734,13 @@ func (m *Master) cleanupWorkerData(jobID string, state *JobState) {
 	for endpoint := range endpoints {
 		go func(workerEndpoint string) {
 			url := fmt.Sprintf("%s/cleanup/%s", workerEndpoint, jobID)
+
 			resp, err := http.Post(url, "application/json", nil)
 			if err != nil {
 				log.Printf("[MASTER] Warning: Failed to send cleanup to %s: %v", workerEndpoint, err)
 				return
 			}
+
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {

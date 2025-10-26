@@ -21,14 +21,17 @@ func (w AverageWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 			emit(toyreduce.KeyValue{Key: parts[0], Value: parts[1]})
 		}
 	}
+
 	return nil
 }
 
 // Combine aggregates values locally by computing sum and count.
 // Emits (key, "sum:count") to allow downstream reducers to compute final average.
 func (w AverageWorker) Combine(key string, values []string, emit toyreduce.Emitter) error {
-	var sum float64
-	var count int
+	var (
+		sum   float64
+		count int
+	)
 
 	for _, v := range values {
 		// Check if value is already in "sum:count" format (from previous combine)
@@ -54,13 +57,16 @@ func (w AverageWorker) Combine(key string, values []string, emit toyreduce.Emitt
 		// Emit as "sum:count" format for further aggregation
 		emit(toyreduce.KeyValue{Key: key, Value: fmt.Sprintf("%f:%d", sum, count)})
 	}
+
 	return nil
 }
 
 // Reduce computes the final average from aggregated sum:count pairs
 func (w AverageWorker) Reduce(key string, values []string, emit toyreduce.Emitter) error {
-	var totalSum float64
-	var totalCount int
+	var (
+		totalSum   float64
+		totalCount int
+	)
 
 	for _, v := range values {
 		// Values should be in "sum:count" format from Combine
@@ -84,6 +90,7 @@ func (w AverageWorker) Reduce(key string, values []string, emit toyreduce.Emitte
 		avg := totalSum / float64(totalCount)
 		emit(toyreduce.KeyValue{Key: key, Value: strconv.FormatFloat(avg, 'f', 2, 64)})
 	}
+
 	return nil
 }
 

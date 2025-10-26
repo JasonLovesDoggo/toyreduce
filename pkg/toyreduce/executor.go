@@ -37,6 +37,7 @@ func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
 		close(out)
 		return err
 	}
+
 	defer f.Close()
 	defer close(out)
 
@@ -58,6 +59,7 @@ func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
 			out <- []string{line}
 		case chunkBytes+lineBytes > targetBytes && len(chunk) > 0:
 			out <- chunk
+
 			chunk = []string{line}
 			chunkBytes = lineBytes
 		default:
@@ -69,16 +71,20 @@ func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
 	if err := sc.Err(); err != nil {
 		return err
 	}
+
 	if len(chunk) > 0 {
 		out <- chunk
 	}
+
 	return nil
 }
 
 func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
 	var all []KeyValue
+
 	for chunk := range chunks {
 		var chunkOutput []KeyValue
+
 		err := worker.Map(chunk, func(kv KeyValue) {
 			chunkOutput = append(chunkOutput, kv)
 		})
@@ -91,8 +97,10 @@ func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		all = append(all, combined...)
 	}
+
 	return all, nil
 }
 
@@ -101,6 +109,7 @@ func Shuffle(pairs []KeyValue) map[string][]string {
 	for _, kv := range pairs {
 		grouped[kv.Key] = append(grouped[kv.Key], kv.Value)
 	}
+
 	return grouped
 }
 
@@ -122,6 +131,7 @@ func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
 
 	// Combine using appropriate function
 	var combined []KeyValue
+
 	emitter := func(kv KeyValue) {
 		combined = append(combined, kv)
 	}
@@ -145,10 +155,12 @@ func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
 
 func ReducePhase(groups map[string][]string, worker Worker) []KeyValue {
 	var results []KeyValue
+
 	for key, values := range groups {
 		worker.Reduce(key, values, func(kv KeyValue) {
 			results = append(results, kv)
 		})
 	}
+
 	return results
 }

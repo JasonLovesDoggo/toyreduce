@@ -14,5 +14,6 @@ func NewBboltStorage(dbPath string) (Storage, error) {
 	}
 
 	log.Printf("[STORAGE] Bbolt storage initialized at %s", dbPath)
+
 	return NewMasterStorage(backend)
 }

@@ -18,6 +18,7 @@ func createTestServer() *Server {
 		mux:    http.NewServeMux(),
 	}
 	s.setupRoutes()
+
 	return s
 }
 
@@ -32,8 +33,9 @@ func TestHandleJobSubmit(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(submitReq)
-	req := httptest.NewRequest("POST", "/api/jobs", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/jobs", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -67,8 +69,9 @@ func TestHandleJobSubmit_InvalidExecutor(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(submitReq)
-	req := httptest.NewRequest("POST", "/api/jobs", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/jobs", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -89,7 +92,7 @@ func TestHandleJobStatus(t *testing.T) {
 		Executor: "wordcount",
 	}
 
-	req := httptest.NewRequest("GET", "/api/jobs/"+jobID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/jobs/"+jobID, nil)
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -115,7 +118,7 @@ func TestHandleJobStatus(t *testing.T) {
 func TestHandleJobStatus_NotFound(t *testing.T) {
 	server := createTestServer()
 
-	req := httptest.NewRequest("GET", "/api/jobs/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/jobs/nonexistent", nil)
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -136,8 +139,9 @@ func TestHandleWorkerRegistration(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(regReq)
-	req := httptest.NewRequest("POST", "/api/workers/register", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/workers/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -176,7 +180,7 @@ func TestHandleWorkerRegistration(t *testing.T) {
 func TestHandleGetNextTask_NoJob(t *testing.T) {
 	server := createTestServer()
 
-	req := httptest.NewRequest("GET", "/api/tasks/next?workerID=worker-1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/next?workerID=worker-1", nil)
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -222,7 +226,7 @@ func TestHandleGetNextTask_WithMapTask(t *testing.T) {
 		DataEndpoint: "http://localhost:9000",
 	}
 
-	req := httptest.NewRequest("GET", "/api/tasks/next?workerID=worker-1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/next?workerID=worker-1", nil)
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -264,7 +268,7 @@ func TestHandleJobList(t *testing.T) {
 		Executor: "actioncount",
 	}
 
-	req := httptest.NewRequest("GET", "/api/jobs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/jobs", nil)
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -298,7 +302,7 @@ func TestHandleWorkerList(t *testing.T) {
 		Executors: []string{"actioncount"},
 	}
 
-	req := httptest.NewRequest("GET", "/api/workers", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/workers", nil)
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)
@@ -325,7 +329,7 @@ func TestHandleWorkerList(t *testing.T) {
 func TestHandleHealth(t *testing.T) {
 	server := createTestServer()
 
-	req := httptest.NewRequest("GET", "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(w, req)

@@ -16,6 +16,7 @@ func IsCompatibleVersion(workerVersion, masterVersion string) (bool, error) {
 	if !semver.IsValid(workerVersion) {
 		return false, fmt.Errorf("invalid worker version: %s", workerVersion)
 	}
+
 	if !semver.IsValid(masterVersion) {
 		return false, fmt.Errorf("invalid master version: %s", masterVersion)
 	}

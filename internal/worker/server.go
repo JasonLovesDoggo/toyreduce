@@ -46,6 +46,7 @@ func NewServer(storage *Storage) (*Server, error) {
 	}
 
 	s.setupRoutes()
+
 	return s, nil
 }
 
@@ -70,6 +71,7 @@ func (s *Server) handleGetPartition(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[WORKER-SERVER] Error getting partition %d for job %s: %v", partition, jobID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+
 		return
 	}
 
@@ -85,6 +87,7 @@ func (s *Server) handleCleanup(w http.ResponseWriter, r *http.Request) {
 	if err := s.storage.CleanupJob(jobID); err != nil {
 		log.Printf("[WORKER-SERVER] Error cleaning up job %s: %v", jobID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+
 		return
 	}
 
@@ -101,6 +104,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	stats := s.storage.Stats()
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
 }
@@ -108,6 +112,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 // Start starts the HTTP server (non-blocking)
 func (s *Server) Start() {
 	log.Printf("[WORKER-SERVER] Starting data server on %s", s.endpoint)
+
 	go func() {
 		if err := http.Serve(s.listener, s.mux); err != nil {
 			log.Printf("[WORKER-SERVER] Server error: %v", err)

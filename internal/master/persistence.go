@@ -7,39 +7,6 @@ import (
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce/protocol"
 )
 
-// persist saves the current state to storage
-func (m *Master) persist() error {
-	if m.storage == nil {
-		return nil // No persistence
-	}
-
-	// Persist jobs
-	for _, job := range m.jobs {
-		if err := m.storage.SaveJob(job); err != nil {
-			log.Printf("[MASTER] Error persisting job %s: %v", job.ID, err)
-		}
-	}
-
-	// Persist job states
-	for jobID, state := range m.jobStates {
-		if err := m.storage.SaveJobState(jobID, state); err != nil {
-			log.Printf("[MASTER] Error persisting job state %s: %v", jobID, err)
-		}
-	}
-
-	// Persist queue
-	if err := m.storage.SaveQueue(m.jobQueue); err != nil {
-		log.Printf("[MASTER] Error persisting queue: %v", err)
-	}
-
-	// Persist current job ID
-	if err := m.storage.SaveCurrentJobID(m.currentJobID); err != nil {
-		log.Printf("[MASTER] Error persisting current job ID: %v", err)
-	}
-
-	return nil
-}
-
 // restore loads state from storage
 func (m *Master) restore() error {
 	if m.storage == nil {

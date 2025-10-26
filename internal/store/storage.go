@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"sync/atomic"
 
 	pkgstorage "pkg.jsn.cam/toyreduce/pkg/storage"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
@@ -22,7 +20,6 @@ var (
 type Storage struct {
 	backend pkgstorage.Backend
 	path    string
-	counter atomic.Uint64 // Counter for append-only keys
 }
 
 // NewStorage creates a new storage instance
@@ -358,9 +355,4 @@ func (s *Storage) Compact() error {
 	s.backend = backend
 
 	return nil
-}
-
-// partitionKey creates a key for partition data
-func partitionKey(partition int) []byte {
-	return []byte(strconv.Itoa(partition))
 }

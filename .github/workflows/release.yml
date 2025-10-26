@@ -80,6 +80,59 @@ jobs:
           # Windows AMD64
           GOOS=windows GOARCH=amd64 go build -o dist/toyreduce-windows-amd64.exe ./cmd/toyreduce
 
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Installation
+
+          Download the appropriate binary for your platform:
+
+          | Platform | Architecture | Download |
+          |----------|--------------|----------|
+          | Linux | AMD64 | `toyreduce-linux-amd64` |
+          | Linux | ARM64 | `toyreduce-linux-arm64` |
+          | macOS | Intel | `toyreduce-darwin-amd64` |
+          | macOS | Apple Silicon | `toyreduce-darwin-arm64` |
+          | Windows | AMD64 | `toyreduce-windows-amd64.exe` |
+
+          ### Quick Start
+
+          ```bash
+          # Linux/macOS: Download and make executable
+          chmod +x toyreduce-*
+          ./toyreduce-* --help
+
+          # Or move to your PATH
+          sudo mv toyreduce-* /usr/local/bin/toyreduce
+          ```
+
+          ## Changes
+
+          EOF
+
+          # Add commit messages since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            git log --pretty=format:"- %s (%h)" -10 >> release_notes.md
+          else
+            git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" >> release_notes.md
+          fi
+
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Checksums (SHA256)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo '```' >> release_notes.md
+          cat dist/checksums.txt >> release_notes.md
+          echo '```' >> release_notes.md
+
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

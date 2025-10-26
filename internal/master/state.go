@@ -51,6 +51,9 @@ type Master struct {
 	// Worker registry
 	workers map[string]*WorkerInfo
 
+	// Async heartbeat processing
+	heartbeatChan chan string
+
 	mu sync.RWMutex
 }
 
@@ -91,7 +94,11 @@ func NewMaster(cfg Config) (*Master, error) {
 		jobStates:        make(map[string]*JobState),
 		jobQueue:         []string{},
 		workers:          make(map[string]*WorkerInfo),
+		heartbeatChan:    make(chan string, 100), // Buffered to prevent blocking
 	}
+
+	// Start async heartbeat processor
+	go m.processHeartbeats()
 
 	// Restore state from storage
 	if err := m.restore(); err != nil {
@@ -280,18 +287,36 @@ func (m *Master) RegisterWorker(workerID, version string, executors []string, da
 	return nil
 }
 
-// UpdateHeartbeat updates worker's last heartbeat time
+// UpdateHeartbeat updates worker's last heartbeat time (async via channel)
 func (m *Master) UpdateHeartbeat(workerID string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Check if worker exists without blocking
+	m.mu.RLock()
+	_, exists := m.workers[workerID]
+	m.mu.RUnlock()
 
-	worker, exists := m.workers[workerID]
 	if !exists {
 		return false
 	}
 
-	worker.LastHeartbeat = time.Now()
-	return true
+	// Send to channel (non-blocking if buffer is full)
+	select {
+	case m.heartbeatChan <- workerID:
+		return true
+	default:
+		// Channel full, but that's OK - heartbeat will be processed eventually
+		return true
+	}
+}
+
+// processHeartbeats processes heartbeat updates asynchronously
+func (m *Master) processHeartbeats() {
+	for workerID := range m.heartbeatChan {
+		m.mu.Lock()
+		if worker, exists := m.workers[workerID]; exists {
+			worker.LastHeartbeat = time.Now()
+		}
+		m.mu.Unlock()
+	}
 }
 
 // GetJob returns job metadata

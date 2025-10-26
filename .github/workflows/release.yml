@@ -139,5 +139,5 @@ jobs:
         run: |
           gh release create ${{ steps.version.outputs.version }} \
             --title "Release ${{ steps.version.outputs.version }}" \
-            --notes "Automated release from commit ${{ steps.version.outputs.short_sha }}" \
+            --notes-file release_notes.md \
             dist/*

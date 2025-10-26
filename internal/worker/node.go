@@ -107,7 +107,7 @@ func (n *Node) Start() error {
 func (n *Node) taskLoop() {
 	pollInterval := n.config.PollInterval
 	if pollInterval == 0 {
-		pollInterval = 2 * time.Second
+		pollInterval = 500 * time.Millisecond
 	}
 
 	for {

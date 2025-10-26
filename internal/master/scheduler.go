@@ -139,6 +139,9 @@ func (m *Master) CompleteMapTask(taskID, workerID, version string, success bool,
 
 		// Record worker endpoint for this map task
 		if worker, exists := m.workers[workerID]; exists {
+			if state.mapWorkerEndpoints == nil {
+				state.mapWorkerEndpoints = make(map[string]string)
+			}
 			state.mapWorkerEndpoints[taskID] = worker.DataEndpoint
 		}
 

@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -37,7 +38,7 @@ func TestProcessMapTask_ContextTimeout(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error from timed-out map task")
 	}
-	if err != context.DeadlineExceeded && err.Error() != "map error: context deadline exceeded" {
+	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Logf("Got error: %v", err)
 	}
 	t.Logf("✓ ProcessMapTask returned error on timeout: %v", err)
@@ -98,7 +99,7 @@ func TestProcessMapTask_ImmediateCancellation(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error from already-cancelled context")
 	}
-	if err != context.Canceled && err.Error() != "map error: context canceled" {
+	if !errors.Is(err, context.Canceled) {
 		t.Logf("Got error: %v", err)
 	}
 	t.Logf("✓ ProcessMapTask returned error on immediate cancellation: %v", err)

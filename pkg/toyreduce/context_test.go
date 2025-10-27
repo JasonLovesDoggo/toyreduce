@@ -33,7 +33,7 @@ func TestChunk_ContextCancellation(t *testing.T) {
 	err = Chunk(ctx, tmpfile.Name(), 1, out)
 
 	// Should return context.Canceled
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}
 
@@ -68,7 +68,7 @@ func TestChunk_ContextTimeout(t *testing.T) {
 	err = Chunk(ctx, tmpfile.Name(), 1, out)
 
 	// Should return context.Canceled
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}
 }
@@ -169,7 +169,7 @@ func TestReducePhase_ContextCancellation(t *testing.T) {
 	if err == nil {
 		t.Error("Expected context error from ReducePhase")
 	}
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected Canceled, got %v", err)
 	}
 }
@@ -214,7 +214,7 @@ func TestCombinePhase_ContextCancellation(t *testing.T) {
 	if err == nil {
 		t.Error("Expected context error from CombinePhase")
 	}
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected Canceled, got %v", err)
 	}
 }
@@ -250,7 +250,7 @@ func TestMapPhase_ImmediateCancellation(t *testing.T) {
 	_, err := MapPhase(ctx, chunks, worker)
 
 	// Should return context.Canceled
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}
 }
@@ -280,7 +280,7 @@ func TestReducePhase_ImmediateCancellation(t *testing.T) {
 	_, err := ReducePhase(ctx, groups, worker)
 
 	// Should return context.Canceled
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}
 }

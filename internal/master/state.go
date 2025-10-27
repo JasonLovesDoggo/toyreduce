@@ -696,7 +696,7 @@ func (m *Master) fetchJobResults(jobID string) {
 // getJobResultsFromStore fetches results for a specific job from the store server
 func (m *Master) getJobResultsFromStore(jobID string) ([]toyreduce.KeyValue, error) {
 	if m.storeURL == "" {
-		return nil, errors.New("store URL not configured")
+		return nil, toyreduce.ErrStoreNotConfigured
 	}
 
 	url := fmt.Sprintf("%s/results/job/%s", m.storeURL, jobID)

@@ -63,11 +63,28 @@ ToyReduce comes with built-in executors, but you can easily create your own by i
 
 ```go
 type Worker interface {
-    Map(chunk []string, emit Emitter) error
-    Reduce(key string, values []string, emit Emitter) error
+    Map(ctx context.Context, chunk []string, emit Emitter) error
+    Reduce(ctx context.Context, key string, values []string, emit Emitter) error
     Description() string
 }
 ```
+
+All methods receive a `context.Context` for proper cancellation and timeout support. Check the context with `select { case <-ctx.Done(): return ctx.Err() }` to support graceful job cancellation and timeouts.
+
+### Optional Combine Phase
+
+For better performance with aggregation-heavy workloads, implement the optional `CombinableWorker` interface to add a combine phase:
+
+```go
+type CombinableWorker interface {
+    Worker
+    // Combine is called after Map to pre-aggregate values locally.
+    // If not implemented, the worker's Reduce() function is used by default.
+    Combine(ctx context.Context, key string, values []string, emit Emitter) error
+}
+```
+
+The combine phase runs on map workers after processing their chunk, reducing intermediate data volume before shuffle. This is especially useful for aggregation operations (sum, count, average) where values for the same key can be pre-combined locally. For operations that require seeing all keys globally, implement `DisableCombinerCheck` to skip combining entirely.
 
 **Built-in Executors:**
 - [wordcount](pkg/executors/wordcount/impl.go) - Count word frequencies in text files

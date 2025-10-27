@@ -1,6 +1,7 @@
 package master
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,8 +33,9 @@ type JobState struct {
 	reduceTasks        []*protocol.ReduceTask
 	mapTasksLeft       int
 	reduceTasksLeft    int
-	worker             toyreduce.Worker  // Executor implementation for this job
-	mapWorkerEndpoints map[string]string // taskID → worker data endpoint
+	worker             toyreduce.Worker   // Executor implementation for this job
+	mapWorkerEndpoints map[string]string  // taskID → worker data endpoint
+	cancelFunc         context.CancelFunc // Cancel function for job execution
 }
 
 // Master coordinates MapReduce jobs in a long-running cluster
@@ -183,9 +185,19 @@ func (m *Master) startNextJobIfReady() {
 
 	log.Printf("[MASTER] Starting job: %s (executor: %s)", jobID, job.Executor)
 
+	// Create job context for cancellation
+	jobCtx, cancel := context.WithCancel(context.Background())
+
+	// Store cancel func in JobState for later cancellation
+	state := &JobState{
+		cancelFunc: cancel,
+	}
+	m.jobStates[jobID] = state
+
 	// Initialize job state
-	if err := m.initializeJob(jobID, job); err != nil {
+	if err := m.initializeJob(jobCtx, jobID, job); err != nil {
 		log.Printf("[MASTER] Failed to initialize job %s: %v", jobID, err)
+		cancel()
 
 		job.Status = protocol.JobStatusFailed
 		job.Error = err.Error()
@@ -224,7 +236,7 @@ func (m *Master) startNextJobIfReady() {
 }
 
 // initializeJob creates the execution state for a job (map tasks, etc)
-func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
+func (m *Master) initializeJob(ctx context.Context, jobID string, job *protocol.Job) error {
 	// Must be called with lock held
 	// Get worker implementation
 	worker := executors.GetExecutor(job.Executor)
@@ -236,7 +248,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 	chunks := make(chan []string, 100)
 
 	go func() {
-		if err := toyreduce.Chunk(job.InputPath, job.ChunkSize, chunks); err != nil {
+		if err := toyreduce.Chunk(ctx, job.InputPath, job.ChunkSize, chunks); err != nil {
 			log.Printf("[MASTER] Error chunking file for job %s: %v", jobID, err)
 		}
 	}()
@@ -393,8 +405,11 @@ func (m *Master) CancelJob(jobID string) error {
 	job.Status = protocol.JobStatusCancelled
 	job.CompletedAt = time.Now()
 
-	// If it's the current job, move to next
+	// If it's the current job, cancel its context and move to next
 	if m.currentJobID == jobID {
+		if state, exists := m.jobStates[jobID]; exists && state.cancelFunc != nil {
+			state.cancelFunc() // Cancel all running operations
+		}
 		m.currentJobID = ""
 		m.startNextJobIfReady()
 	} else {
@@ -626,11 +641,11 @@ func (m *Master) completeJob(jobID string) {
 	duration := job.CompletedAt.Sub(job.StartedAt)
 	log.Printf("[MASTER] Job %s completed in %v", jobID, duration)
 
-	// Fetch results from store
-	go m.fetchJobResults(jobID)
+	// Fetch results from store (use background context as cleanup is not cancellable)
+	go m.fetchJobResults(context.Background(), jobID)
 
 	// Send cleanup notifications to workers
-	go m.cleanupWorkerData(jobID, state)
+	go m.cleanupWorkerData(context.Background(), jobID, state)
 
 	// Clear current job and start next
 	m.currentJobID = ""
@@ -665,14 +680,14 @@ func (m *Master) checkJobCompletion() {
 }
 
 // fetchJobResults fetches the final results from store and stores them in the job
-func (m *Master) fetchJobResults(jobID string) {
+func (m *Master) fetchJobResults(ctx context.Context, jobID string) {
 	job := m.GetJob(jobID)
 	if job == nil {
 		return
 	}
 
 	// Fetch job-specific results from store
-	results, err := m.getJobResultsFromStore(jobID)
+	results, err := m.getJobResultsFromStore(ctx, jobID)
 	if err != nil {
 		log.Printf("[MASTER] Failed to fetch results for job %s: %v", jobID, err)
 		return
@@ -694,14 +709,19 @@ func (m *Master) fetchJobResults(jobID string) {
 }
 
 // getJobResultsFromStore fetches results for a specific job from the store server
-func (m *Master) getJobResultsFromStore(jobID string) ([]toyreduce.KeyValue, error) {
+func (m *Master) getJobResultsFromStore(ctx context.Context, jobID string) ([]toyreduce.KeyValue, error) {
 	if m.storeURL == "" {
 		return nil, errors.New("store URL not configured")
 	}
 
 	url := fmt.Sprintf("%s/results/job/%s", m.storeURL, jobID)
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch results: %w", err)
 	}
@@ -721,7 +741,7 @@ func (m *Master) getJobResultsFromStore(jobID string) ([]toyreduce.KeyValue, err
 }
 
 // cleanupWorkerData sends cleanup requests to all workers that participated in the job
-func (m *Master) cleanupWorkerData(jobID string, state *JobState) {
+func (m *Master) cleanupWorkerData(ctx context.Context, jobID string, state *JobState) {
 	// Collect unique worker endpoints
 	endpoints := make(map[string]bool)
 	for _, endpoint := range state.mapWorkerEndpoints {
@@ -735,7 +755,14 @@ func (m *Master) cleanupWorkerData(jobID string, state *JobState) {
 		go func(workerEndpoint string) {
 			url := fmt.Sprintf("%s/cleanup/%s", workerEndpoint, jobID)
 
-			resp, err := http.Post(url, "application/json", nil)
+			req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+			if err != nil {
+				log.Printf("[MASTER] Warning: Failed to create cleanup request to %s: %v", workerEndpoint, err)
+				return
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				log.Printf("[MASTER] Warning: Failed to send cleanup to %s: %v", workerEndpoint, err)
 				return

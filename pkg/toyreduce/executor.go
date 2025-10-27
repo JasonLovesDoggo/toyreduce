@@ -2,6 +2,7 @@ package toyreduce
 
 import (
 	"bufio"
+	"context"
 	"os"
 )
 
@@ -33,7 +34,7 @@ Chunk → Map → Shuffle → Reduce → Collect
 */
 // Chunk splits a file into line-preserving chunks roughly chunkSizeMB each.
 // It sends each chunk to the out channel and closes it when done.
-func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
+func Chunk(ctx context.Context, filePath string, chunkSizeMB int, out chan<- []string) error {
 	f, err := os.Open(filePath)
 	if err != nil {
 		close(out)
@@ -52,6 +53,11 @@ func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
 	)
 
 	for sc.Scan() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		line := sc.Text()
 		lineBytes := int64(len(line) + 1) // include newline
 
@@ -81,13 +87,18 @@ func Chunk(filePath string, chunkSizeMB int, out chan<- []string) error {
 	return nil
 }
 
-func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
+func MapPhase(ctx context.Context, chunks <-chan []string, worker Worker) ([]KeyValue, error) {
 	var all []KeyValue
 
 	for chunk := range chunks {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		var chunkOutput []KeyValue
 
-		err := worker.Map(chunk, func(kv KeyValue) {
+		err := worker.Map(ctx, chunk, func(kv KeyValue) {
 			chunkOutput = append(chunkOutput, kv)
 		})
 		if err != nil {
@@ -95,7 +106,7 @@ func MapPhase(chunks <-chan []string, worker Worker) ([]KeyValue, error) {
 		}
 
 		// Apply combine phase to this chunk's output to reduce intermediate data
-		combined, err := CombinePhase(chunkOutput, worker)
+		combined, err := CombinePhase(ctx, chunkOutput, worker)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +131,7 @@ func Shuffle(pairs []KeyValue) map[string][]string {
 // 1. Worker implements DisableCombiner() returning true → skip combining
 // 2. Otherwise, if Worker implements CombinableWorker with Combine() → use custom logic
 // 3. Otherwise, use the worker's Reduce() function as combiner
-func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
+func CombinePhase(ctx context.Context, pairs []KeyValue, worker Worker) ([]KeyValue, error) {
 	// Check if worker opts-out of combining
 	if disabler, ok := worker.(DisableCombinerCheck); ok {
 		if disabler.DisableCombiner() {
@@ -139,14 +150,19 @@ func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
 	}
 
 	for key, values := range grouped {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		// Check if worker has custom Combine() method
 		if combinable, ok := worker.(CombinableWorker); ok {
-			if err := combinable.Combine(key, values, emitter); err != nil {
+			if err := combinable.Combine(ctx, key, values, emitter); err != nil {
 				return nil, err
 			}
 		} else {
 			// Default: use Reduce() for combining
-			if err := worker.Reduce(key, values, emitter); err != nil {
+			if err := worker.Reduce(ctx, key, values, emitter); err != nil {
 				return nil, err
 			}
 		}
@@ -155,14 +171,21 @@ func CombinePhase(pairs []KeyValue, worker Worker) ([]KeyValue, error) {
 	return combined, nil
 }
 
-func ReducePhase(groups map[string][]string, worker Worker) []KeyValue {
+func ReducePhase(ctx context.Context, groups map[string][]string, worker Worker) ([]KeyValue, error) {
 	var results []KeyValue
 
 	for key, values := range groups {
-		worker.Reduce(key, values, func(kv KeyValue) {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		if err := worker.Reduce(ctx, key, values, func(kv KeyValue) {
 			results = append(results, kv)
-		})
+		}); err != nil {
+			return nil, err
+		}
 	}
 
-	return results
+	return results, nil
 }

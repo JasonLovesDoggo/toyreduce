@@ -1,6 +1,7 @@
 package urldedup
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 	"strings"
@@ -14,8 +15,13 @@ import (
 type URLDedupWorker struct{}
 
 // Map extracts domain from each URL and emits (domain, url)
-func (w URLDedupWorker) Map(chunk []string, emit toyreduce.Emitter) error {
+func (w URLDedupWorker) Map(ctx context.Context, chunk []string, emit toyreduce.Emitter) error {
 	for _, line := range chunk {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -39,7 +45,12 @@ func (w URLDedupWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 }
 
 // Reduce deduplicates URLs and counts unique URLs per domain
-func (w URLDedupWorker) Reduce(key string, values []string, emit toyreduce.Emitter) error {
+func (w URLDedupWorker) Reduce(ctx context.Context, key string, values []string, emit toyreduce.Emitter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 	seen := make(map[string]struct{})
 	for _, urlvalue := range values {
 		seen[urlvalue] = struct{}{}

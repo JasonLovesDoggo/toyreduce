@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -134,7 +137,20 @@ func runWorkerMode() {
 		log.Fatalf("Failed to create worker: %v", err)
 	}
 
-	if err := node.Start(); err != nil {
+	// Create a root context for worker lifecycle
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle signals for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		sig := <-sigChan
+		log.Printf("Received shutdown signal (%v), stopping worker...", sig)
+		cancel()
+	}()
+
+	if err := node.Start(ctx); err != nil {
 		log.Fatalf("Worker error: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package toyreduce
 
 import (
+	"context"
 	"os"
 	"testing"
 )
@@ -59,7 +60,7 @@ func TestChunk(t *testing.T) {
 			errCh := make(chan error, 1)
 
 			go func() {
-				errCh <- Chunk(tmpfile.Name(), tt.chunkSizeMB, out)
+				errCh <- Chunk(context.Background(), tmpfile.Name(), tt.chunkSizeMB, out)
 			}()
 
 			// Collect chunks
@@ -116,7 +117,7 @@ func TestChunk_LargeFile(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		errCh <- Chunk(tmpfile.Name(), chunkSizeMB, out)
+		errCh <- Chunk(context.Background(), tmpfile.Name(), chunkSizeMB, out)
 	}()
 
 	var chunks [][]string
@@ -151,7 +152,7 @@ func TestChunk_NonexistentFile(t *testing.T) {
 
 	out := make(chan []string, 1)
 
-	err := Chunk("/nonexistent/path/file.txt", 1, out)
+	err := Chunk(context.Background(), "/nonexistent/path/file.txt", 1, out)
 	if err == nil {
 		t.Error("Expected error for nonexistent file, got nil")
 	}
@@ -252,14 +253,14 @@ func TestMapPhase(t *testing.T) {
 		t.Parallel()
 		// Worker that emits key-value pairs and has a passthrough reduce
 		var myWorker Worker = WorkerFunc{
-			MapFunc: func(chunk []string, emit Emitter) error {
+			MapFunc: func(ctx context.Context, chunk []string, emit Emitter) error {
 				for _, line := range chunk {
 					emit(KeyValue{Key: line, Value: "1"})
 				}
 
 				return nil
 			},
-			ReduceFunc: func(key string, values []string, emit Emitter) error {
+			ReduceFunc: func(ctx context.Context, key string, values []string, emit Emitter) error {
 				// Passthrough for testing
 				for _, val := range values {
 					emit(KeyValue{Key: key, Value: val})
@@ -276,7 +277,7 @@ func TestMapPhase(t *testing.T) {
 
 		close(chunks)
 
-		result, err := MapPhase(chunks, myWorker)
+		result, err := MapPhase(context.Background(), chunks, myWorker)
 		if err != nil {
 			t.Fatalf("MapPhase error: %v", err)
 		}
@@ -299,21 +300,21 @@ func TestMapPhase(t *testing.T) {
 
 // WorkerFunc allows using functions as Workers
 type WorkerFunc struct {
-	MapFunc    func([]string, Emitter) error
-	ReduceFunc func(string, []string, Emitter) error
+	MapFunc    func(context.Context, []string, Emitter) error
+	ReduceFunc func(context.Context, string, []string, Emitter) error
 }
 
-func (w WorkerFunc) Map(chunk []string, emit Emitter) error {
+func (w WorkerFunc) Map(ctx context.Context, chunk []string, emit Emitter) error {
 	if w.MapFunc != nil {
-		return w.MapFunc(chunk, emit)
+		return w.MapFunc(ctx, chunk, emit)
 	}
 
 	return nil
 }
 
-func (w WorkerFunc) Reduce(key string, values []string, emit Emitter) error {
+func (w WorkerFunc) Reduce(ctx context.Context, key string, values []string, emit Emitter) error {
 	if w.ReduceFunc != nil {
-		return w.ReduceFunc(key, values, emit)
+		return w.ReduceFunc(ctx, key, values, emit)
 	}
 
 	return nil
@@ -327,7 +328,7 @@ func TestReducePhase(t *testing.T) {
 	t.Parallel()
 	// Create a test worker that counts values
 	testWorker := &testMapReduceWorker{
-		reduceFunc: func(key string, values []string, emit Emitter) error {
+		reduceFunc: func(ctx context.Context, key string, values []string, emit Emitter) error {
 			// Sum the values
 			total := len(values)
 			emit(KeyValue{Key: key, Value: string(rune('0' + total))})
@@ -342,7 +343,10 @@ func TestReducePhase(t *testing.T) {
 		"cherry": {"1", "2"},
 	}
 
-	result := ReducePhase(groups, testWorker)
+	result, err := ReducePhase(context.Background(), groups, testWorker)
+	if err != nil {
+		t.Fatalf("ReducePhase error: %v", err)
+	}
 
 	// Should have 3 results (one per key)
 	if len(result) != 3 {
@@ -372,21 +376,21 @@ func TestReducePhase(t *testing.T) {
 
 // Helper test worker implementation
 type testMapReduceWorker struct {
-	mapFunc    func(chunk []string, emit Emitter) error
-	reduceFunc func(key string, values []string, emit Emitter) error
+	mapFunc    func(context.Context, []string, Emitter) error
+	reduceFunc func(context.Context, string, []string, Emitter) error
 }
 
-func (w *testMapReduceWorker) Map(chunk []string, emit Emitter) error {
+func (w *testMapReduceWorker) Map(ctx context.Context, chunk []string, emit Emitter) error {
 	if w.mapFunc != nil {
-		return w.mapFunc(chunk, emit)
+		return w.mapFunc(ctx, chunk, emit)
 	}
 
 	return nil
 }
 
-func (w *testMapReduceWorker) Reduce(key string, values []string, emit Emitter) error {
+func (w *testMapReduceWorker) Reduce(ctx context.Context, key string, values []string, emit Emitter) error {
 	if w.reduceFunc != nil {
-		return w.reduceFunc(key, values, emit)
+		return w.reduceFunc(ctx, key, values, emit)
 	}
 
 	return nil

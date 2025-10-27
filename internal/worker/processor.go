@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -25,7 +26,7 @@ func NewProcessor(worker toyreduce.Worker, client *Client, storage *Storage) *Pr
 }
 
 // ProcessMapTask executes a map task
-func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) error {
+func (p *Processor) ProcessMapTask(ctx context.Context, task *protocol.MapTask, workerID string) error {
 	log.Printf("[WORKER:%s] Processing map task %s (%d lines)",
 		workerID, task.ID, len(task.Chunk))
 
@@ -37,14 +38,14 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 	}
 
 	// Execute map function
-	if err := p.worker.Map(task.Chunk, emitter); err != nil {
+	if err := p.worker.Map(ctx, task.Chunk, emitter); err != nil {
 		return fmt.Errorf("map error: %w", err)
 	}
 
 	log.Printf("[WORKER:%s] Map emitted %d key-value pairs", workerID, len(emitted))
 
 	// Apply combine phase to reduce intermediate data before partitioning
-	combined, err := toyreduce.CombinePhase(emitted, p.worker)
+	combined, err := toyreduce.CombinePhase(ctx, emitted, p.worker)
 	if err != nil {
 		return fmt.Errorf("combine error: %w", err)
 	}
@@ -64,7 +65,7 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 	}
 
 	// Notify master of completion
-	if err := p.client.CompleteTask(task.ID, workerID, task.Version, true, ""); err != nil {
+	if err := p.client.CompleteTask(ctx, task.ID, workerID, task.Version, true, ""); err != nil {
 		return fmt.Errorf("complete task error: %w", err)
 	}
 
@@ -74,7 +75,7 @@ func (p *Processor) ProcessMapTask(task *protocol.MapTask, workerID string) erro
 }
 
 // ProcessReduceTask executes a reduce task
-func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string) error {
+func (p *Processor) ProcessReduceTask(ctx context.Context, task *protocol.ReduceTask, workerID string) error {
 	log.Printf("[WORKER:%s] Processing reduce task %s (partition %d) from %d workers",
 		workerID, task.ID, task.Partition, len(task.WorkerEndpoints))
 
@@ -82,7 +83,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 	var intermediate []toyreduce.KeyValue
 
 	for _, endpoint := range task.WorkerEndpoints {
-		data, err := p.client.FetchPartitionFromWorker(endpoint, task.JobID, task.Partition)
+		data, err := p.client.FetchPartitionFromWorker(ctx, endpoint, task.JobID, task.Partition)
 		if err != nil {
 			log.Printf("[WORKER:%s] Warning: Failed to fetch from %s: %v", workerID, endpoint, err)
 			// Continue with other workers - partial data is better than failure
@@ -110,7 +111,7 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 
 	// Execute reduce function for each key
 	for key, values := range grouped {
-		if err := p.worker.Reduce(key, values, emitter); err != nil {
+		if err := p.worker.Reduce(ctx, key, values, emitter); err != nil {
 			return fmt.Errorf("reduce error for key %s: %w", key, err)
 		}
 	}
@@ -118,12 +119,12 @@ func (p *Processor) ProcessReduceTask(task *protocol.ReduceTask, workerID string
 	log.Printf("[WORKER:%s] Reduce produced %d results", workerID, len(results))
 
 	// Store results in store
-	if err := p.client.StoreReduceOutput(task.ID, task.JobID, results); err != nil {
+	if err := p.client.StoreReduceOutput(ctx, task.ID, task.JobID, results); err != nil {
 		return fmt.Errorf("store reduce output error: %w", err)
 	}
 
 	// Notify master of completion
-	if err := p.client.CompleteTask(task.ID, workerID, task.Version, true, ""); err != nil {
+	if err := p.client.CompleteTask(ctx, task.ID, workerID, task.Version, true, ""); err != nil {
 		return fmt.Errorf("complete task error: %w", err)
 	}
 

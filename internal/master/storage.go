@@ -42,11 +42,11 @@ type Storage interface {
 
 // SerializableJobState is a JSON-serializable version of JobState
 type SerializableJobState struct {
+	ExecutorName    string                 `json:"executor_name"` // Store executor name to recreate worker
 	MapTasks        []*protocol.MapTask    `json:"map_tasks"`
 	ReduceTasks     []*protocol.ReduceTask `json:"reduce_tasks"`
 	MapTasksLeft    int                    `json:"map_tasks_left"`
 	ReduceTasksLeft int                    `json:"reduce_tasks_left"`
-	ExecutorName    string                 `json:"executor_name"` // Store executor name to recreate worker
 }
 
 // ToSerializable converts JobState to SerializableJobState

@@ -168,9 +168,9 @@ func TestShuffle(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
+		want  map[string][]string
 		name  string
 		pairs []KeyValue
-		want  map[string][]string
 	}{
 		{
 			name:  "empty input",

@@ -17,24 +17,24 @@ import (
 
 // WorkerInfo tracks information about a registered worker
 type WorkerInfo struct {
+	LastHeartbeat   time.Time
+	InProgressSince time.Time
 	ID              string
 	Version         string
-	Executors       []string
 	DataEndpoint    string // HTTP endpoint for fetching partition data
-	LastHeartbeat   time.Time
 	CurrentTask     string
-	InProgressSince time.Time
+	Executors       []string
 }
 
 // JobState holds execution state for a single job
 type JobState struct {
+	worker             toyreduce.Worker
+	mapWorkerEndpoints map[string]string
+	cancelFunc         context.CancelFunc
 	mapTasks           []*protocol.MapTask
 	reduceTasks        []*protocol.ReduceTask
 	mapTasksLeft       int
 	reduceTasksLeft    int
-	worker             toyreduce.Worker   // Executor implementation for this job
-	mapWorkerEndpoints map[string]string  // taskID → worker data endpoint
-	cancelFunc         context.CancelFunc // Cancel function for job execution
 }
 
 // Master coordinates MapReduce jobs in a long-running cluster
@@ -62,10 +62,10 @@ type Master struct {
 
 // Config holds master configuration
 type Config struct {
-	Port             int
 	StoreURL         string
-	HeartbeatTimeout time.Duration
 	DBPath           string // Path to bbolt database (empty = no persistence)
+	Port             int
+	HeartbeatTimeout time.Duration
 }
 
 // NewMaster creates a new master instance (no job required)

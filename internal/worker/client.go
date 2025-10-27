@@ -15,9 +15,9 @@ import (
 
 // Client handles HTTP communication with master and store
 type Client struct {
+	http      *http.Client
 	masterURL string
 	storeURL  string
-	http      *http.Client
 }
 
 // NewClient creates a new worker client

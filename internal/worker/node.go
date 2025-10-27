@@ -15,10 +15,10 @@ import (
 // Config holds worker configuration
 type Config struct {
 	MasterURL         string
+	DataDir           string // Directory for worker data storage
 	PollInterval      time.Duration
 	HeartbeatInterval time.Duration
-	DataDir           string // Directory for worker data storage
-	EphemeralStorage  bool   // Use unique database path per worker instance (default: true)
+	EphemeralStorage  bool // Use unique database path per worker instance (default: false)
 }
 
 // Node represents a worker node

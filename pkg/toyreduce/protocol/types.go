@@ -27,68 +27,68 @@ const (
 
 // MapTask represents a chunk of data to be mapped
 type MapTask struct {
+	StartTime     time.Time  `json:"start_time"`
+	CompletedAt   time.Time  `json:"completed_at,omitempty"`
 	ID            string     `json:"id"`
 	JobID         string     `json:"job_id"`
 	Executor      string     `json:"executor"` // executor name for this task
-	Chunk         []string   `json:"chunk"`
 	Status        TaskStatus `json:"status"`
 	WorkerID      string     `json:"worker_id"`
-	StartTime     time.Time  `json:"start_time"`
-	CompletedAt   time.Time  `json:"completed_at,omitempty"`
 	Version       string     `json:"version"` // for idempotency
+	Chunk         []string   `json:"chunk"`
 	NumPartitions int        `json:"num_partitions"`
 	RetryCount    int        `json:"retry_count"`
 }
 
 // ReduceTask represents a partition to be reduced
 type ReduceTask struct {
+	StartTime       time.Time  `json:"start_time"`
+	CompletedAt     time.Time  `json:"completed_at,omitempty"`
 	ID              string     `json:"id"`
 	JobID           string     `json:"job_id"`
 	Executor        string     `json:"executor"` // executor name for this task
-	Partition       int        `json:"partition"`
 	Status          TaskStatus `json:"status"`
 	WorkerID        string     `json:"worker_id"`
-	StartTime       time.Time  `json:"start_time"`
-	CompletedAt     time.Time  `json:"completed_at,omitempty"`
 	Version         string     `json:"version"` // for idempotency
+	WorkerEndpoints []string   `json:"worker_endpoints,omitempty"`
+	Partition       int        `json:"partition"`
 	RetryCount      int        `json:"retry_count"`
-	WorkerEndpoints []string   `json:"worker_endpoints,omitempty"` // Endpoints of workers with map task data
 }
 
 // Task is a union type for map and reduce tasks
 type Task struct {
-	Type       TaskType    `json:"type"`
 	MapTask    *MapTask    `json:"map_task,omitempty"`
 	ReduceTask *ReduceTask `json:"reduce_task,omitempty"`
+	Type       TaskType    `json:"type"`
 }
 
 // WorkerRegistrationRequest is sent by workers to register with master
 type WorkerRegistrationRequest struct {
 	WorkerID     string   `json:"worker_id"`
 	Version      string   `json:"version"`       // ToyReduce version
-	Executors    []string `json:"executors"`     // Supported executors
 	DataEndpoint string   `json:"data_endpoint"` // HTTP endpoint for serving partition data
+	Executors    []string `json:"executors"`     // Supported executors
 }
 
 // WorkerRegistrationResponse is returned to workers upon registration
 type WorkerRegistrationResponse struct {
 	WorkerID string `json:"worker_id"`
 	StoreURL string `json:"store_url"`
-	Success  bool   `json:"success"`
 	Error    string `json:"error,omitempty"`
+	Success  bool   `json:"success"`
 }
 
 // TaskCompletionRequest is sent by workers when they complete a task
 type TaskCompletionRequest struct {
-	Success bool   `json:"success"`
 	Error   string `json:"error,omitempty"`
 	Version string `json:"version"`
+	Success bool   `json:"success"`
 }
 
 // TaskCompletionResponse acknowledges task completion
 type TaskCompletionResponse struct {
-	Acknowledged bool   `json:"acknowledged"`
 	Message      string `json:"message,omitempty"`
+	Acknowledged bool   `json:"acknowledged"`
 }
 
 // HeartbeatRequest is sent periodically by workers to master
@@ -103,29 +103,27 @@ type HeartbeatResponse struct {
 
 // StatusResponse provides overall job status
 type StatusResponse struct {
-	MapTasksTotal      int `json:"map_tasks_total"`
-	MapTasksIdle       int `json:"map_tasks_idle"`
-	MapTasksInProgress int `json:"map_tasks_in_progress"`
-	MapTasksCompleted  int `json:"map_tasks_completed"`
-	MapTasksFailed     int `json:"map_tasks_failed"`
-
-	ReduceTasksTotal      int `json:"reduce_tasks_total"`
-	ReduceTasksIdle       int `json:"reduce_tasks_idle"`
-	ReduceTasksInProgress int `json:"reduce_tasks_in_progress"`
-	ReduceTasksCompleted  int `json:"reduce_tasks_completed"`
-	ReduceTasksFailed     int `json:"reduce_tasks_failed"`
-
-	WorkersRegistered int    `json:"workers_registered"`
-	WorkersActive     int    `json:"workers_active"`
-	JobStatus         string `json:"job_status"` // "mapping", "reducing", "completed", "failed"
+	JobStatus             string `json:"job_status"` // "mapping", "reducing", "completed", "failed"
+	ReduceTasksIdle       int    `json:"reduce_tasks_idle"`
+	MapTasksInProgress    int    `json:"map_tasks_in_progress"`
+	MapTasksCompleted     int    `json:"map_tasks_completed"`
+	MapTasksFailed        int    `json:"map_tasks_failed"`
+	ReduceTasksTotal      int    `json:"reduce_tasks_total"`
+	MapTasksTotal         int    `json:"map_tasks_total"`
+	ReduceTasksInProgress int    `json:"reduce_tasks_in_progress"`
+	ReduceTasksCompleted  int    `json:"reduce_tasks_completed"`
+	ReduceTasksFailed     int    `json:"reduce_tasks_failed"`
+	WorkersRegistered     int    `json:"workers_registered"`
+	WorkersActive         int    `json:"workers_active"`
+	MapTasksIdle          int    `json:"map_tasks_idle"`
 }
 
 // IntermediateData represents key-value pairs for a partition
 type IntermediateData struct {
 	TaskID    string               `json:"task_id"`
 	JobID     string               `json:"job_id"`
-	Partition int                  `json:"partition"`
 	Data      []toyreduce.KeyValue `json:"data"`
+	Partition int                  `json:"partition"`
 }
 
 // HealthResponse indicates node health

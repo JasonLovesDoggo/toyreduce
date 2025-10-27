@@ -146,9 +146,9 @@ func TestShuffleAndGroup(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
+		want map[string][]string
 		name string
 		kvs  []toyreduce.KeyValue
-		want map[string][]string
 	}{
 		{
 			name: "empty input",

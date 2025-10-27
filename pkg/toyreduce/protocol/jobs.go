@@ -113,8 +113,8 @@ type JobCancelRequest struct {
 
 // JobCancelResponse is returned after cancelling a job
 type JobCancelResponse struct {
-	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
+	Success bool   `json:"success"`
 }
 
 // UIJobsResponse aggregates data for the UI
@@ -125,9 +125,9 @@ type UIJobsResponse struct {
 
 // UIWorker represents worker info for the UI
 type UIWorker struct {
-	ID            string    `json:"id"`
-	Executors     []string  `json:"executors"`
-	CurrentTask   string    `json:"current_task,omitempty"`
 	LastHeartbeat time.Time `json:"last_heartbeat"`
+	ID            string    `json:"id"`
+	CurrentTask   string    `json:"current_task,omitempty"`
+	Executors     []string  `json:"executors"`
 	Online        bool      `json:"online"`
 }

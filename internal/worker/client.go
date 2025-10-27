@@ -24,8 +24,11 @@ type Client struct {
 func NewClient(masterURL string) *Client {
 	return &Client{
 		masterURL: masterURL,
-		http:      &http.Client{
-			// Per-request timeouts handled via context deadlines
+		http: &http.Client{
+			// Add default timeout as safety net to prevent indefinite hangs.
+			// Per-request timeouts can be enforced via context deadlines which will override this.
+			// This ensures that requests don't hang if no context deadline is set.
+			Timeout: 30 * time.Second,
 		},
 	}
 }

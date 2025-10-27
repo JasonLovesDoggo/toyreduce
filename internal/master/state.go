@@ -3,7 +3,6 @@ package master
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -268,15 +267,21 @@ func (m *Master) initializeJob(ctx context.Context, jobID string, job *protocol.
 		mapTasks = append(mapTasks, task)
 	}
 
-	// Create job state
-	state := &JobState{
-		mapTasks:           mapTasks,
-		reduceTasks:        []*protocol.ReduceTask{},
-		mapTasksLeft:       len(mapTasks),
-		worker:             worker,
-		mapWorkerEndpoints: make(map[string]string),
+	// Update existing job state (preserve cancelFunc created in startNextJobIfReady)
+	state := m.jobStates[jobID]
+	if state == nil {
+		// Fallback for edge case where state wasn't pre-created
+		state = &JobState{
+			cancelFunc: func() {},
+		}
+		m.jobStates[jobID] = state
 	}
-	m.jobStates[jobID] = state
+	state.mapTasks = mapTasks
+	state.reduceTasks = []*protocol.ReduceTask{}
+	state.mapTasksLeft = len(mapTasks)
+	state.reduceTasksLeft = 0
+	state.worker = worker
+	state.mapWorkerEndpoints = make(map[string]string)
 
 	// Update job metadata
 	job.MapTasksTotal = len(mapTasks)

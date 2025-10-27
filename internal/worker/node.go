@@ -104,7 +104,10 @@ func (n *Node) Start(ctx context.Context) error {
 	return nil
 }
 
-// taskLoop polls for and processes tasks
+// taskLoop polls for tasks from master and processes them.
+// The function runs indefinitely until context cancellation is triggered.
+// The defer ticker.Stop() executes when the function exits (on context cancellation),
+// ensuring the ticker is properly cleaned up.
 func (n *Node) taskLoop(ctx context.Context) {
 	pollInterval := n.config.PollInterval
 	if pollInterval == 0 {
@@ -178,7 +181,10 @@ func (n *Node) taskLoop(ctx context.Context) {
 	}
 }
 
-// heartbeatLoop sends periodic heartbeats to master
+// heartbeatLoop sends periodic heartbeats to the master.
+// The function runs indefinitely until context cancellation is triggered.
+// The defer ticker.Stop() executes when the function exits (on context cancellation),
+// ensuring the ticker is properly cleaned up.
 func (n *Node) heartbeatLoop(ctx context.Context) {
 	interval := n.config.HeartbeatInterval
 	if interval == 0 {

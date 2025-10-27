@@ -19,7 +19,7 @@ func TestBasicWordCount(t *testing.T) {
 	defer os.Remove(tmpfile.Name())
 
 	// Write test data
-	testData := "hello world\nhello go\nworld of mapreduce\ngo "
+	testData := "hello world\nhello go\nworld of mapreduce\ngo go go"
 	if _, err := tmpfile.WriteString(testData); err != nil {
 		t.Fatalf("Failed to write test data: %v", err)
 	}

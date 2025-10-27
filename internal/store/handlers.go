@@ -28,6 +28,7 @@ func NewServer(dbPath string) (*Server, error) {
 		mux:     http.NewServeMux(),
 	}
 	s.setupRoutes()
+
 	return s, nil
 }
 
@@ -55,6 +56,7 @@ func (s *Server) setupRoutes() {
 
 func (s *Server) handleStoreMapOutput(w http.ResponseWriter, r *http.Request) error {
 	partitionStr := r.PathValue("partition")
+
 	partition, err := strconv.Atoi(partitionStr)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid partition")
@@ -71,11 +73,13 @@ func (s *Server) handleStoreMapOutput(w http.ResponseWriter, r *http.Request) er
 	log.Printf("[STORE] Stored %d KVs for partition %d from task %s", len(data.Data), partition, data.TaskID)
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+
 	return nil
 }
 
 func (s *Server) handleGetReduceInput(w http.ResponseWriter, r *http.Request) error {
 	partitionStr := r.PathValue("partition")
+
 	partition, err := strconv.Atoi(partitionStr)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid partition")
@@ -86,6 +90,7 @@ func (s *Server) handleGetReduceInput(w http.ResponseWriter, r *http.Request) er
 	log.Printf("[STORE] Retrieved %d KVs for partition %d", len(data), partition)
 
 	httpx.JSON(w, http.StatusOK, data)
+
 	return nil
 }
 
@@ -107,6 +112,7 @@ func (s *Server) handleStoreReduceOutput(w http.ResponseWriter, r *http.Request)
 	log.Printf("[STORE] Stored reduce results for job %s task %s (%d KVs)", data.JobID, taskID, len(data.Data))
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+
 	return nil
 }
 
@@ -120,6 +126,7 @@ func (s *Server) handleGetReduceOutput(w http.ResponseWriter, r *http.Request) e
 	}
 
 	httpx.JSON(w, http.StatusOK, data)
+
 	return nil
 }
 
@@ -130,6 +137,7 @@ func (s *Server) handleGetJobResults(w http.ResponseWriter, r *http.Request) err
 	log.Printf("[STORE] Retrieved results for job %s (%d KVs)", jobID, len(data))
 
 	httpx.JSON(w, http.StatusOK, data)
+
 	return nil
 }
 
@@ -137,11 +145,14 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) error {
 	if err := s.storage.Reset(); err != nil {
 		log.Printf("[STORE] Reset error: %v", err)
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
+
 		return nil
 	}
+
 	log.Println("[STORE] Storage reset")
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "reset"})
+
 	return nil
 }
 
@@ -151,12 +162,14 @@ func (s *Server) handleCompact(w http.ResponseWriter, r *http.Request) error {
 	if err := s.storage.Compact(); err != nil {
 		log.Printf("[STORE] Compact error: %v", err)
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
+
 		return nil
 	}
 
 	log.Println("[STORE] Database compacted successfully")
 
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "compacted"})
+
 	return nil
 }
 
@@ -168,6 +181,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) error {
 	stats := s.storage.Stats()
 	httpx.JSON(w, http.StatusOK, stats)
+
 	return nil
 }
 
@@ -175,5 +189,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) Start(port int) error {
 	addr := ":" + strconv.Itoa(port)
 	log.Printf("[STORE] Starting store server on %s", addr)
+
 	return http.ListenAndServe(addr, s.mux)
 }

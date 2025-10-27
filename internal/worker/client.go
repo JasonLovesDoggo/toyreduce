@@ -60,7 +60,7 @@ func (c *Client) Register(workerID string, version string, executors []string, d
 
 	// Check if registration was successful
 	if !regResp.Success {
-		return nil, fmt.Errorf("registration failed: %s", regResp.Error)
+		return nil, fmt.Errorf("%w: %s", toyreduce.ErrRegistrationFailed, regResp.Error)
 	}
 
 	// Store store URL
@@ -80,7 +80,7 @@ func (c *Client) GetNextTask(workerID string) (*protocol.Task, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("get task failed: %s", resp.Status)
+		return nil, fmt.Errorf("%w: %s", toyreduce.ErrGetTaskFailed, resp.Status)
 	}
 
 	var task protocol.Task
@@ -114,7 +114,7 @@ func (c *Client) CompleteTask(taskID, workerID, version string, success bool, er
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("complete task failed: %s - %s", resp.Status, string(bodyBytes))
+		return fmt.Errorf("%w: %s - %s", toyreduce.ErrCompleteTaskFailed, resp.Status, string(bodyBytes))
 	}
 
 	return nil
@@ -140,7 +140,7 @@ func (c *Client) SendHeartbeat(workerID string) (bool, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("heartbeat failed: %s", resp.Status)
+		return false, fmt.Errorf("%w: %s", toyreduce.ErrHeartbeatFailed, resp.Status)
 	}
 
 	var hbResp protocol.HeartbeatResponse
@@ -173,7 +173,7 @@ func (c *Client) StoreMapOutput(taskID string, partition int, data []toyreduce.K
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("store map output failed: %s", resp.Status)
+		return fmt.Errorf("%w: %s", toyreduce.ErrStoreMapOutputFailed, resp.Status)
 	}
 
 	return nil
@@ -190,7 +190,7 @@ func (c *Client) GetReduceInput(partition int) ([]toyreduce.KeyValue, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("get reduce input failed: %s", resp.Status)
+		return nil, fmt.Errorf("%w: %s", toyreduce.ErrGetReduceInputFailed, resp.Status)
 	}
 
 	var data []toyreduce.KeyValue
@@ -223,7 +223,7 @@ func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyVal
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("store reduce output failed: %s", resp.Status)
+		return fmt.Errorf("%w: %s", toyreduce.ErrStoreReduceOutputFailed, resp.Status)
 	}
 
 	return nil

@@ -10,8 +10,12 @@ type testStruct struct {
 }
 
 func TestJSONStore(t *testing.T) {
+	t.Parallel()
 	t.Run("PutAndGetJSON", func(t *testing.T) {
+		t.Parallel()
+
 		backend := NewMemoryBackend()
+
 		store := NewJSONStore(backend)
 		defer store.Close()
 
@@ -39,7 +43,10 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("GetJSONNonExistent", func(t *testing.T) {
+		t.Parallel()
+
 		backend := NewMemoryBackend()
+
 		store := NewJSONStore(backend)
 		defer store.Close()
 
@@ -58,7 +65,10 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("JSONArray", func(t *testing.T) {
+		t.Parallel()
+
 		backend := NewMemoryBackend()
+
 		store := NewJSONStore(backend)
 		defer store.Close()
 
@@ -80,6 +90,7 @@ func TestJSONStore(t *testing.T) {
 		if len(got) != len(original) {
 			t.Fatalf("Got length %d, want %d", len(got), len(original))
 		}
+
 		for i, v := range original {
 			if got[i] != v {
 				t.Errorf("Index %d: got %d, want %d", i, got[i], v)
@@ -88,7 +99,10 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("JSONMap", func(t *testing.T) {
+		t.Parallel()
+
 		backend := NewMemoryBackend()
+
 		store := NewJSONStore(backend)
 		defer store.Close()
 
@@ -114,6 +128,7 @@ func TestJSONStore(t *testing.T) {
 		if len(got) != len(original) {
 			t.Fatalf("Got length %d, want %d", len(got), len(original))
 		}
+
 		for k, v := range original {
 			if got[k] != v {
 				t.Errorf("Key %s: got %d, want %d", k, got[k], v)
@@ -122,7 +137,10 @@ func TestJSONStore(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
+		t.Parallel()
+
 		backend := NewMemoryBackend()
+
 		store := NewJSONStore(backend)
 		defer store.Close()
 
@@ -138,14 +156,19 @@ func TestJSONStore(t *testing.T) {
 
 		// Verify deleted
 		var got testStruct
+
 		store.GetJSON([]byte("test"), []byte("key1"), &got)
+
 		if got.Name != "" || got.Value != 0 {
 			t.Errorf("Key should be deleted, got %+v", got)
 		}
 	})
 
 	t.Run("Transaction", func(t *testing.T) {
+		t.Parallel()
+
 		backend := NewMemoryBackend()
+
 		store := NewJSONStore(backend)
 		defer store.Close()
 
@@ -154,6 +177,7 @@ func TestJSONStore(t *testing.T) {
 			if err := tx.CreateBucket([]byte("test")); err != nil {
 				return err
 			}
+
 			b := tx.Bucket([]byte("test"))
 			if b == nil {
 				t.Fatal("Bucket should not be nil")
@@ -164,6 +188,7 @@ func TestJSONStore(t *testing.T) {
 			if err != nil {
 				return err
 			}
+
 			return b.Put([]byte("key1"), data)
 		})
 		if err != nil {
@@ -172,6 +197,7 @@ func TestJSONStore(t *testing.T) {
 
 		// Use View transaction
 		var got testStruct
+
 		err = store.View(func(tx Transaction) error {
 			b := tx.Bucket([]byte("test"))
 			if b == nil {
@@ -182,6 +208,7 @@ func TestJSONStore(t *testing.T) {
 			if data == nil {
 				t.Fatal("Data should not be nil")
 			}
+
 			return DecodeJSON(data, &got)
 		})
 		if err != nil {
@@ -195,18 +222,25 @@ func TestJSONStore(t *testing.T) {
 }
 
 func TestEncodeDecodeJSON(t *testing.T) {
+	t.Parallel()
 	t.Run("EncodeJSON", func(t *testing.T) {
+		t.Parallel()
+
 		original := testStruct{Name: "test", Value: 42}
+
 		data, err := EncodeJSON(original)
 		if err != nil {
 			t.Fatalf("EncodeJSON failed: %v", err)
 		}
+
 		if len(data) == 0 {
 			t.Error("EncodeJSON returned empty data")
 		}
 	})
 
 	t.Run("DecodeJSON", func(t *testing.T) {
+		t.Parallel()
+
 		original := testStruct{Name: "test", Value: 42}
 		data, _ := EncodeJSON(original)
 
@@ -221,7 +255,10 @@ func TestEncodeDecodeJSON(t *testing.T) {
 	})
 
 	t.Run("DecodeJSONInvalidData", func(t *testing.T) {
+		t.Parallel()
+
 		var got testStruct
+
 		err := DecodeJSON([]byte("invalid json"), &got)
 		if err == nil {
 			t.Error("DecodeJSON should fail for invalid JSON")

@@ -10,21 +10,20 @@ import (
 
 // TestBasicWordCount tests the full MapReduce pipeline with wordcount
 func TestBasicWordCount(t *testing.T) {
+	t.Parallel()
 	// Create a temporary input file
-	tmpfile, err := os.CreateTemp("", "integration-test-*.txt")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "integration-test-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 	defer os.Remove(tmpfile.Name())
 
 	// Write test data
-	testData := `hello world
-hello go
-world of mapreduce
-go go go`
+	testData := "hello world\nhello go\nworld of mapreduce\ngo go go"
 	if _, err := tmpfile.WriteString(testData); err != nil {
 		t.Fatalf("Failed to write test data: %v", err)
 	}
+
 	tmpfile.Close()
 
 	// Run MapReduce with wordcount worker
@@ -32,6 +31,7 @@ go go go`
 
 	// Chunk the file
 	chunks := make(chan []string, 10)
+
 	go func() {
 		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)
@@ -86,16 +86,21 @@ go go go`
 
 // TestEmptyFile tests MapReduce with an empty input file
 func TestEmptyFile(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "empty-test-*.txt")
+	t.Parallel()
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "empty-test-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
+
 	defer os.Remove(tmpfile.Name())
+
 	tmpfile.Close()
 
 	worker := wordcount.WordCountWorker{}
 
 	chunks := make(chan []string, 1)
+
 	go func() {
 		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)
@@ -117,20 +122,25 @@ func TestEmptyFile(t *testing.T) {
 
 // TestSingleLine tests MapReduce with a single line
 func TestSingleLine(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "single-line-*.txt")
+	t.Parallel()
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "single-line-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
+
 	defer os.Remove(tmpfile.Name())
 
 	if _, err := tmpfile.WriteString("hello\n"); err != nil {
 		t.Fatalf("Failed to write: %v", err)
 	}
+
 	tmpfile.Close()
 
 	worker := wordcount.WordCountWorker{}
 
 	chunks := make(chan []string, 1)
+
 	go func() {
 		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)
@@ -160,21 +170,26 @@ func TestSingleLine(t *testing.T) {
 
 // TestLargeInput tests MapReduce with multiple chunks
 func TestLargeInput(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "large-input-*.txt")
+	t.Parallel()
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "large-input-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
+
 	defer os.Remove(tmpfile.Name())
 
 	// Write enough data to create multiple chunks
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		tmpfile.WriteString("word test data line\n")
 	}
+
 	tmpfile.Close()
 
 	worker := wordcount.WordCountWorker{}
 
 	chunks := make(chan []string, 100)
+
 	go func() {
 		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)

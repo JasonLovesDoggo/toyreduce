@@ -113,6 +113,7 @@ func (s *Storage) CleanupJob(jobID string) error {
 			if bytes.HasPrefix(name, prefix) {
 				bucketsToDelete = append(bucketsToDelete, append([]byte(nil), name...))
 			}
+
 			return nil
 		})
 		if err != nil {

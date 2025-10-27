@@ -8,10 +8,13 @@ import (
 // backendTestSuite runs a comprehensive test suite against any Backend implementation
 func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) {
 	t.Run("CreateBucket", func(t *testing.T) {
+		t.Parallel()
+
 		backend, cleanup, err := newBackend()
 		if err != nil {
 			t.Fatalf("failed to create backend: %v", err)
 		}
+
 		defer cleanup()
 
 		if err := backend.CreateBucket([]byte("test")); err != nil {
@@ -22,6 +25,7 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 		if err != nil {
 			t.Fatalf("BucketExists failed: %v", err)
 		}
+
 		if !exists {
 			t.Error("Bucket should exist after creation")
 		}
@@ -33,13 +37,17 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 	})
 
 	t.Run("DeleteBucket", func(t *testing.T) {
+		t.Parallel()
+
 		backend, cleanup, err := newBackend()
 		if err != nil {
 			t.Fatalf("failed to create backend: %v", err)
 		}
+
 		defer cleanup()
 
 		backend.CreateBucket([]byte("test"))
+
 		if err := backend.DeleteBucket([]byte("test")); err != nil {
 			t.Fatalf("DeleteBucket failed: %v", err)
 		}
@@ -56,16 +64,21 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 	})
 
 	t.Run("PutAndGet", func(t *testing.T) {
+		t.Parallel()
+
 		backend, cleanup, err := newBackend()
 		if err != nil {
 			t.Fatalf("failed to create backend: %v", err)
 		}
+
 		defer cleanup()
 
 		backend.CreateBucket([]byte("test"))
 
 		key := []byte("key1")
+
 		value := []byte("value1")
+
 		if err := backend.Put([]byte("test"), key, value); err != nil {
 			t.Fatalf("Put failed: %v", err)
 		}
@@ -74,6 +87,7 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 		if err != nil {
 			t.Fatalf("Get failed: %v", err)
 		}
+
 		if !bytes.Equal(got, value) {
 			t.Errorf("Get returned %s, want %s", got, value)
 		}
@@ -83,19 +97,24 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 		if err != nil {
 			t.Fatalf("Get failed: %v", err)
 		}
+
 		if got != nil {
 			t.Errorf("Get should return nil for non-existent key, got %s", got)
 		}
 	})
 
 	t.Run("Delete", func(t *testing.T) {
+		t.Parallel()
+
 		backend, cleanup, err := newBackend()
 		if err != nil {
 			t.Fatalf("failed to create backend: %v", err)
 		}
+
 		defer cleanup()
 
 		backend.CreateBucket([]byte("test"))
+
 		key := []byte("key1")
 		backend.Put([]byte("test"), key, []byte("value1"))
 
@@ -110,10 +129,13 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 	})
 
 	t.Run("ForEach", func(t *testing.T) {
+		t.Parallel()
+
 		backend, cleanup, err := newBackend()
 		if err != nil {
 			t.Fatalf("failed to create backend: %v", err)
 		}
+
 		defer cleanup()
 
 		backend.CreateBucket([]byte("test"))
@@ -128,6 +150,7 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 		}
 
 		collected := make(map[string]string)
+
 		err = backend.ForEach([]byte("test"), func(k, v []byte) error {
 			collected[string(k)] = string(v)
 			return nil
@@ -139,6 +162,7 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 		if len(collected) != len(expected) {
 			t.Errorf("ForEach collected %d items, want %d", len(collected), len(expected))
 		}
+
 		for k, v := range expected {
 			if collected[k] != v {
 				t.Errorf("ForEach: key %s = %s, want %s", k, collected[k], v)
@@ -147,20 +171,25 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 	})
 
 	t.Run("Transactions", func(t *testing.T) {
+		t.Parallel()
+
 		backend, cleanup, err := newBackend()
 		if err != nil {
 			t.Fatalf("failed to create backend: %v", err)
 		}
+
 		defer cleanup()
 
 		err = backend.Update(func(tx Transaction) error {
 			if err := tx.CreateBucket([]byte("test")); err != nil {
 				return err
 			}
+
 			b := tx.Bucket([]byte("test"))
 			if b == nil {
 				t.Fatal("Bucket should not be nil")
 			}
+
 			return b.Put([]byte("key1"), []byte("value1"))
 		})
 		if err != nil {
@@ -168,27 +197,34 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 		}
 
 		var gotValue []byte
+
 		err = backend.View(func(tx Transaction) error {
 			b := tx.Bucket([]byte("test"))
 			if b == nil {
 				t.Fatal("Bucket should not be nil")
 			}
+
 			gotValue = b.Get([]byte("key1"))
+
 			return nil
 		})
 		if err != nil {
 			t.Fatalf("View transaction failed: %v", err)
 		}
+
 		if !bytes.Equal(gotValue, []byte("value1")) {
 			t.Errorf("Got %s, want value1", gotValue)
 		}
 	})
 
 	t.Run("ForEachBucket", func(t *testing.T) {
+		t.Parallel()
+
 		backend, cleanup, err := newBackend()
 		if err != nil {
 			t.Fatalf("failed to create backend: %v", err)
 		}
+
 		defer cleanup()
 
 		buckets := []string{"bucket1", "bucket2", "bucket3"}
@@ -197,6 +233,7 @@ func backendTestSuite(t *testing.T, newBackend func() (Backend, func(), error)) 
 		}
 
 		var collected []string
+
 		err = backend.View(func(tx Transaction) error {
 			return tx.ForEachBucket(func(name []byte) error {
 				collected = append(collected, string(name))

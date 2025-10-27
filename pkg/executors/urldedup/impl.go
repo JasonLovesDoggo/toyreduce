@@ -34,6 +34,7 @@ func (w URLDedupWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 
 		emit(toyreduce.KeyValue{Key: domain, Value: line})
 	}
+
 	return nil
 }
 
@@ -46,6 +47,7 @@ func (w URLDedupWorker) Reduce(key string, values []string, emit toyreduce.Emitt
 
 	// Emit count of unique URLs for this domain
 	emit(toyreduce.KeyValue{Key: key, Value: strconv.Itoa(len(seen))})
+
 	return nil
 }
 

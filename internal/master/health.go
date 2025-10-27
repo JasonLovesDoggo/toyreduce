@@ -10,11 +10,13 @@ import (
 // StartHealthMonitor starts a goroutine that monitors worker health
 func (m *Master) StartHealthMonitor(heartbeatTimeout time.Duration) {
 	ticker := time.NewTicker(5 * time.Second)
+
 	go func() {
 		for range ticker.C {
 			m.checkWorkerHealth(heartbeatTimeout)
 		}
 	}()
+
 	log.Printf("[MASTER] Health monitor started (timeout: %v)", heartbeatTimeout)
 }
 
@@ -31,6 +33,7 @@ func (m *Master) checkWorkerHealth(timeout time.Duration) {
 		if now.Sub(worker.LastHeartbeat) > timeout {
 			log.Printf("[MASTER] Worker %s is dead (last heartbeat: %v ago)",
 				workerID, now.Sub(worker.LastHeartbeat))
+
 			deadWorkers = append(deadWorkers, workerID)
 
 			// Requeue the worker's current task
@@ -74,6 +77,7 @@ func (m *Master) requeueTask(taskID string) {
 				log.Printf("[MASTER] Job %s: Requeued map task %s (retry %d)",
 					m.currentJobID, taskID, task.RetryCount)
 			}
+
 			return
 		}
 	}
@@ -88,6 +92,7 @@ func (m *Master) requeueTask(taskID string) {
 				log.Printf("[MASTER] Job %s: Requeued reduce task %s (retry %d)",
 					m.currentJobID, taskID, task.RetryCount)
 			}
+
 			return
 		}
 	}

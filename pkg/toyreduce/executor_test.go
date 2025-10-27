@@ -6,6 +6,8 @@ import (
 )
 
 func TestChunk(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		fileContent    string
@@ -38,8 +40,9 @@ func TestChunk(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Create temp file
-			tmpfile, err := os.CreateTemp("", "chunk-test-*.txt")
+			tmpfile, err := os.CreateTemp(t.TempDir(), "chunk-test-*.txt")
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
@@ -48,6 +51,7 @@ func TestChunk(t *testing.T) {
 			if _, err := tmpfile.WriteString(tt.fileContent); err != nil {
 				t.Fatalf("Failed to write temp file: %v", err)
 			}
+
 			tmpfile.Close()
 
 			// Run Chunk
@@ -79,6 +83,7 @@ func TestChunk(t *testing.T) {
 			for _, chunk := range chunks {
 				totalLines += len(chunk)
 			}
+
 			if totalLines != tt.wantTotalLines {
 				t.Errorf("Got %d total lines, want %d", totalLines, tt.wantTotalLines)
 			}
@@ -87,8 +92,9 @@ func TestChunk(t *testing.T) {
 }
 
 func TestChunk_LargeFile(t *testing.T) {
+	t.Parallel()
 	// Create a file with lines that will span multiple chunks
-	tmpfile, err := os.CreateTemp("", "chunk-large-*.txt")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "chunk-large-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -96,9 +102,10 @@ func TestChunk_LargeFile(t *testing.T) {
 
 	// Write 1000 lines (approximately 50KB if each line is ~50 bytes)
 	numLines := 1000
-	for i := 0; i < numLines; i++ {
+	for range numLines {
 		tmpfile.WriteString("This is line number and it contains some text\n")
 	}
+
 	tmpfile.Close()
 
 	// Chunk with small chunk size to force multiple chunks
@@ -107,6 +114,7 @@ func TestChunk_LargeFile(t *testing.T) {
 	chunkSizeMB := 1 // 1MB chunk size
 
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- Chunk(tmpfile.Name(), chunkSizeMB, out)
 	}()
@@ -125,6 +133,7 @@ func TestChunk_LargeFile(t *testing.T) {
 	for _, chunk := range chunks {
 		totalLines += len(chunk)
 	}
+
 	if totalLines != numLines {
 		t.Errorf("Got %d total lines, want %d", totalLines, numLines)
 	}
@@ -138,9 +147,11 @@ func TestChunk_LargeFile(t *testing.T) {
 }
 
 func TestChunk_NonexistentFile(t *testing.T) {
-	out := make(chan []string, 1)
-	err := Chunk("/nonexistent/path/file.txt", 1, out)
+	t.Parallel()
 
+	out := make(chan []string, 1)
+
+	err := Chunk("/nonexistent/path/file.txt", 1, out)
 	if err == nil {
 		t.Error("Expected error for nonexistent file, got nil")
 	}
@@ -153,6 +164,8 @@ func TestChunk_NonexistentFile(t *testing.T) {
 }
 
 func TestShuffle(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		pairs []KeyValue
@@ -201,6 +214,8 @@ func TestShuffle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := Shuffle(tt.pairs)
 
 			// Check all expected keys
@@ -210,6 +225,7 @@ func TestShuffle(t *testing.T) {
 					t.Errorf("Key %q not found in result", key)
 					continue
 				}
+
 				if len(gotValues) != len(wantValues) {
 					t.Errorf("Key %q has %d values, want %d", key, len(gotValues), len(wantValues))
 					continue
@@ -231,13 +247,16 @@ func TestShuffle(t *testing.T) {
 }
 
 func TestMapPhase(t *testing.T) {
+	t.Parallel()
 	t.Run("simple map", func(t *testing.T) {
+		t.Parallel()
 		// Worker that emits key-value pairs and has a passthrough reduce
 		var myWorker Worker = WorkerFunc{
 			MapFunc: func(chunk []string, emit Emitter) error {
 				for _, line := range chunk {
 					emit(KeyValue{Key: line, Value: "1"})
 				}
+
 				return nil
 			},
 			ReduceFunc: func(key string, values []string, emit Emitter) error {
@@ -245,17 +264,19 @@ func TestMapPhase(t *testing.T) {
 				for _, val := range values {
 					emit(KeyValue{Key: key, Value: val})
 				}
+
 				return nil
 			},
 		}
 
 		chunks := make(chan []string, 2)
 		chunks <- []string{"hello"}
+
 		chunks <- []string{"world"}
+
 		close(chunks)
 
 		result, err := MapPhase(chunks, myWorker)
-
 		if err != nil {
 			t.Fatalf("MapPhase error: %v", err)
 		}
@@ -286,6 +307,7 @@ func (w WorkerFunc) Map(chunk []string, emit Emitter) error {
 	if w.MapFunc != nil {
 		return w.MapFunc(chunk, emit)
 	}
+
 	return nil
 }
 
@@ -293,6 +315,7 @@ func (w WorkerFunc) Reduce(key string, values []string, emit Emitter) error {
 	if w.ReduceFunc != nil {
 		return w.ReduceFunc(key, values, emit)
 	}
+
 	return nil
 }
 
@@ -300,36 +323,15 @@ func (w WorkerFunc) Description() string {
 	return "test worker func"
 }
 
-// Simple worker that directly implements the interface
-type simpleTestWorker struct {
-	t *testing.T
-}
-
-func (w *simpleTestWorker) Map(chunk []string, emit Emitter) error {
-	w.t.Logf("Map called with %d lines", len(chunk))
-	for _, line := range chunk {
-		w.t.Logf("About to emit: %s -> 1", line)
-		emit(KeyValue{Key: line, Value: "1"})
-		w.t.Logf("Emitted: %s", line)
-	}
-	return nil
-}
-
-func (w *simpleTestWorker) Reduce(key string, values []string, emit Emitter) error {
-	return nil
-}
-
-func (w *simpleTestWorker) Description() string {
-	return "simple test worker"
-}
-
 func TestReducePhase(t *testing.T) {
+	t.Parallel()
 	// Create a test worker that counts values
 	testWorker := &testMapReduceWorker{
 		reduceFunc: func(key string, values []string, emit Emitter) error {
 			// Sum the values
 			total := len(values)
 			emit(KeyValue{Key: key, Value: string(rune('0' + total))})
+
 			return nil
 		},
 	}
@@ -378,6 +380,7 @@ func (w *testMapReduceWorker) Map(chunk []string, emit Emitter) error {
 	if w.mapFunc != nil {
 		return w.mapFunc(chunk, emit)
 	}
+
 	return nil
 }
 
@@ -385,6 +388,7 @@ func (w *testMapReduceWorker) Reduce(key string, values []string, emit Emitter) 
 	if w.reduceFunc != nil {
 		return w.reduceFunc(key, values, emit)
 	}
+
 	return nil
 }
 

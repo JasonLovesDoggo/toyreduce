@@ -19,6 +19,7 @@ func (w MaxValueWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 			emit(toyreduce.KeyValue{Key: parts[0], Value: parts[1]})
 		}
 	}
+
 	return nil
 }
 
@@ -36,6 +37,7 @@ func (w MaxValueWorker) Combine(key string, values []string, emit toyreduce.Emit
 	}
 
 	emit(toyreduce.KeyValue{Key: key, Value: strconv.FormatFloat(maxVal, 'f', -1, 64)})
+
 	return nil
 }
 
@@ -54,5 +56,6 @@ func parseFloat(s string) float64 {
 	if err != nil {
 		return 0
 	}
+
 	return val
 }

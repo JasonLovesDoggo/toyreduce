@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"sync/atomic"
 
 	pkgstorage "pkg.jsn.cam/toyreduce/pkg/storage"
 	"pkg.jsn.cam/toyreduce/pkg/toyreduce"
@@ -22,7 +20,6 @@ var (
 type Storage struct {
 	backend pkgstorage.Backend
 	path    string
-	counter atomic.Uint64 // Counter for append-only keys
 }
 
 // NewStorage creates a new storage instance
@@ -100,9 +97,11 @@ func (s *Storage) GetReduceInput(partition int) []toyreduce.KeyValue {
 		if b == nil {
 			return nil
 		}
+
 		if v := b.Get(key); v != nil {
 			pkgstorage.DecodeJSON(v, &result)
 		}
+
 		return nil
 	})
 
@@ -132,18 +131,23 @@ func (s *Storage) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyVa
 func (s *Storage) GetReduceOutput(taskID string) ([]toyreduce.KeyValue, bool) {
 	key := []byte(taskID)
 
-	var result []toyreduce.KeyValue
-	var found bool
+	var (
+		result []toyreduce.KeyValue
+		found  bool
+	)
 
 	s.backend.View(func(tx pkgstorage.Transaction) error {
 		b := tx.Bucket(resultsBucket)
 		if b == nil {
 			return nil
 		}
+
 		if v := b.Get(key); v != nil {
 			pkgstorage.DecodeJSON(v, &result)
+
 			found = true
 		}
+
 		return nil
 	})
 
@@ -153,6 +157,7 @@ func (s *Storage) GetReduceOutput(taskID string) ([]toyreduce.KeyValue, bool) {
 // GetJobResults returns all results for a specific job
 func (s *Storage) GetJobResults(jobID string) []toyreduce.KeyValue {
 	var all []toyreduce.KeyValue
+
 	prefix := []byte(fmt.Sprintf("job_%s_", jobID))
 
 	s.backend.View(func(tx pkgstorage.Transaction) error {
@@ -168,10 +173,13 @@ func (s *Storage) GetJobResults(jobID string) []toyreduce.KeyValue {
 				if err := pkgstorage.DecodeJSON(v, &data); err != nil {
 					return nil // Skip corrupted data
 				}
+
 				all = append(all, data...)
 			}
+
 			return nil
 		})
+
 		return nil
 	})
 
@@ -185,6 +193,7 @@ func (s *Storage) Reset() error {
 		if err := tx.DeleteBucket(intermediateBucket); err != nil {
 			return err
 		}
+
 		if err := tx.DeleteBucket(resultsBucket); err != nil {
 			return err
 		}
@@ -192,6 +201,7 @@ func (s *Storage) Reset() error {
 		if err := tx.CreateBucket(intermediateBucket); err != nil {
 			return err
 		}
+
 		if err := tx.CreateBucket(resultsBucket); err != nil {
 			return err
 		}
@@ -213,10 +223,12 @@ func (s *Storage) Stats() map[string]interface{} {
 		if b != nil {
 			b.ForEach(func(k, v []byte) error {
 				intermediatePartitions++
+
 				var data []toyreduce.KeyValue
 				if err := pkgstorage.DecodeJSON(v, &data); err == nil {
 					intermediateKVs += len(data)
 				}
+
 				return nil
 			})
 		}
@@ -229,10 +241,12 @@ func (s *Storage) Stats() map[string]interface{} {
 		if b != nil {
 			b.ForEach(func(k, v []byte) error {
 				reduceTasks++
+
 				var data []toyreduce.KeyValue
 				if err := pkgstorage.DecodeJSON(v, &data); err == nil {
 					resultKVs += len(data)
 				}
+
 				return nil
 			})
 		}
@@ -255,6 +269,7 @@ func (s *Storage) getFileSize() int64 {
 	if err != nil {
 		return 0
 	}
+
 	return info.Size()
 }
 
@@ -273,6 +288,7 @@ func (s *Storage) Compact() error {
 		if err := tempBackend.CreateBucket(bucket); err != nil {
 			tempBackend.Close()
 			os.Remove(tempPath)
+
 			return err
 		}
 	}
@@ -287,6 +303,7 @@ func (s *Storage) Compact() error {
 				if dstBucket == nil {
 					return fmt.Errorf("destination bucket not found: %s", intermediateBucket)
 				}
+
 				if err := srcBucket.ForEach(func(k, v []byte) error {
 					return dstBucket.Put(k, v)
 				}); err != nil {
@@ -301,6 +318,7 @@ func (s *Storage) Compact() error {
 				if dstBucket == nil {
 					return fmt.Errorf("destination bucket not found: %s", resultsBucket)
 				}
+
 				if err := srcBucket.ForEach(func(k, v []byte) error {
 					return dstBucket.Put(k, v)
 				}); err != nil {
@@ -311,10 +329,10 @@ func (s *Storage) Compact() error {
 			return nil
 		})
 	})
-
 	if err != nil {
 		tempBackend.Close()
 		os.Remove(tempPath)
+
 		return err
 	}
 
@@ -333,12 +351,8 @@ func (s *Storage) Compact() error {
 	if err != nil {
 		return err
 	}
+
 	s.backend = backend
 
 	return nil
-}
-
-// partitionKey creates a key for partition data
-func partitionKey(partition int) []byte {
-	return []byte(strconv.Itoa(partition))
 }

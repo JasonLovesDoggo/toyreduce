@@ -116,6 +116,7 @@ func (n *Node) taskLoop() {
 		if err != nil {
 			log.Printf("[WORKER:%s] Error getting next task: %v", n.id, err)
 			time.Sleep(pollInterval)
+
 			continue
 		}
 
@@ -131,6 +132,7 @@ func (n *Node) taskLoop() {
 			if worker == nil {
 				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.MapTask.Executor)
 				time.Sleep(pollInterval)
+
 				continue
 			}
 
@@ -151,6 +153,7 @@ func (n *Node) taskLoop() {
 			if worker == nil {
 				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.ReduceTask.Executor)
 				time.Sleep(pollInterval)
+
 				continue
 			}
 
@@ -193,6 +196,7 @@ func (n *Node) heartbeatLoop() {
 		// This happens when master restarts and loses worker registrations
 		if !ok {
 			log.Printf("[WORKER:%s] Heartbeat rejected - master doesn't recognize worker, re-registering", n.id)
+
 			if err := n.reregister(); err != nil {
 				log.Printf("[WORKER:%s] Re-registration failed: %v", n.id, err)
 			} else {
@@ -213,5 +217,6 @@ func (n *Node) reregister() error {
 	}
 
 	log.Printf("[WORKER:%s] Re-registered with master (store: %s)", n.id, regResp.StoreURL)
+
 	return nil
 }

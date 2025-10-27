@@ -7,6 +7,7 @@ import (
 )
 
 func TestBboltBackend(t *testing.T) {
+	t.Parallel()
 	backendTestSuite(t, func() (Backend, func(), error) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")

@@ -14,13 +14,14 @@ type ActionCountWorker struct{}
 func (w ActionCountWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 	for _, line := range chunk {
 		words := strings.Fields(line)
-		for i := 0; i < len(words); i++ {
+		for i := range words {
 			if words[i] == "did" && i+1 < len(words) {
 				emit(toyreduce.KeyValue{Key: words[i+1], Value: "1"})
 				break
 			}
 		}
 	}
+
 	return nil
 }
 

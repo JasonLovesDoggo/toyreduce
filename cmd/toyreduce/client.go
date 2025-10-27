@@ -64,6 +64,7 @@ func listJobsHTTP(masterURL string) {
 
 	fmt.Printf("%-36s %-12s %-15s %s\n", "JOB ID", "STATUS", "EXECUTOR", "SUBMITTED")
 	fmt.Println("─────────────────────────────────────────────────────────────────────────────────────────")
+
 	for _, job := range listResp.Jobs {
 		fmt.Printf("%-36s %-12s %-15s %s\n",
 			job.ID,
@@ -139,6 +140,7 @@ func getJobResultsHTTP(masterURL, jobID string) {
 		Key   string `json:"key"`
 		Value string `json:"value"`
 	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
 		log.Fatalf("Failed to decode response: %v", err)
 	}
@@ -150,6 +152,7 @@ func getJobResultsHTTP(masterURL, jobID string) {
 
 	fmt.Printf("Job Results (%d entries):\n", len(results))
 	fmt.Println("─────────────────────────────────────────────────────────")
+
 	for _, kv := range results {
 		fmt.Printf("%-30s %s\n", kv.Key, kv.Value)
 	}

@@ -7,6 +7,8 @@ import (
 )
 
 func TestPartitionKey(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		key            string
@@ -20,6 +22,7 @@ func TestPartitionKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Test consistency: same key should always give same partition
 			partition1 := PartitionKey(tt.key, tt.numPartitions)
 			partition2 := PartitionKey(tt.key, tt.numPartitions)
@@ -38,6 +41,7 @@ func TestPartitionKey(t *testing.T) {
 }
 
 func TestPartitionKey_Distribution(t *testing.T) {
+	t.Parallel()
 	// Test that keys are distributed across partitions (not all in one)
 	numPartitions := 4
 	partitions := make(map[int]int)
@@ -56,6 +60,8 @@ func TestPartitionKey_Distribution(t *testing.T) {
 }
 
 func TestPartitionMapOutput(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		kvs            []toyreduce.KeyValue
@@ -91,6 +97,8 @@ func TestPartitionMapOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := PartitionMapOutput(tt.kvs, tt.numPartitions)
 
 			// Check all partitions are in valid range
@@ -105,6 +113,7 @@ func TestPartitionMapOutput(t *testing.T) {
 			for _, kvs := range result {
 				totalKVs += len(kvs)
 			}
+
 			if totalKVs != len(tt.kvs) {
 				t.Errorf("Total KVs in partitions = %d, want %d", totalKVs, len(tt.kvs))
 			}
@@ -116,6 +125,7 @@ func TestPartitionMapOutput(t *testing.T) {
 
 			// Verify same key always goes to same partition
 			keyToPartition := make(map[string]int)
+
 			for partition, kvs := range result {
 				for _, kv := range kvs {
 					if prevPartition, exists := keyToPartition[kv.Key]; exists {
@@ -124,6 +134,7 @@ func TestPartitionMapOutput(t *testing.T) {
 								kv.Key, prevPartition, partition)
 						}
 					}
+
 					keyToPartition[kv.Key] = partition
 				}
 			}
@@ -132,6 +143,8 @@ func TestPartitionMapOutput(t *testing.T) {
 }
 
 func TestShuffleAndGroup(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		kvs  []toyreduce.KeyValue
@@ -180,6 +193,8 @@ func TestShuffleAndGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := ShuffleAndGroup(tt.kvs)
 
 			// Check all expected keys exist
@@ -189,6 +204,7 @@ func TestShuffleAndGroup(t *testing.T) {
 					t.Errorf("Key %q not found in result", key)
 					continue
 				}
+
 				if len(gotValues) != len(wantValues) {
 					t.Errorf("Key %q has %d values, want %d", key, len(gotValues), len(wantValues))
 				}

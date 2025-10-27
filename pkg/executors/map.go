@@ -28,7 +28,7 @@ func GetExecutor(name string) toyreduce.Worker {
 }
 
 func ListExecutors() []string {
-	var names []string
+	var names = make([]string, 0, len(Executors))
 	for name := range Executors {
 		names = append(names, name)
 	}
@@ -43,5 +43,5 @@ func GetDescription(name string) (string, error) {
 		return worker.Description(), nil
 	}
 
-	return "", toyreduce.InvalidExecutorError
+	return "", toyreduce.ErrInvalidExecutor
 }

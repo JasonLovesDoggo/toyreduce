@@ -56,9 +56,7 @@ func (m *MemoryBackend) Put(bucket, key, value []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	bucketStr := string(bucket)
-
-	bkt, exists := m.buckets[bucketStr]
+	bkt, exists := m.buckets[string(bucket)]
 	if !exists {
 		return fmt.Errorf("bucket not found: %s", bucket)
 	}
@@ -76,9 +74,7 @@ func (m *MemoryBackend) Get(bucket, key []byte) ([]byte, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	bucketStr := string(bucket)
-
-	bkt, exists := m.buckets[bucketStr]
+	bkt, exists := m.buckets[string(bucket)]
 	if !exists {
 		return nil, fmt.Errorf("bucket not found: %s", bucket)
 	}
@@ -100,9 +96,7 @@ func (m *MemoryBackend) Delete(bucket, key []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	bucketStr := string(bucket)
-
-	bkt, exists := m.buckets[bucketStr]
+	bkt, exists := m.buckets[string(bucket)]
 	if !exists {
 		return fmt.Errorf("bucket not found: %s", bucket)
 	}
@@ -117,9 +111,7 @@ func (m *MemoryBackend) ForEach(bucket []byte, fn func(k, v []byte) error) error
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	bucketStr := string(bucket)
-
-	bkt, exists := m.buckets[bucketStr]
+	bkt, exists := m.buckets[string(bucket)]
 	if !exists {
 		return fmt.Errorf("bucket not found: %s", bucket)
 	}

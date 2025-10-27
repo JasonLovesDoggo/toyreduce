@@ -124,7 +124,7 @@ func (m *Master) SubmitJob(req protocol.JobSubmitRequest) (string, error) {
 
 	// Validate executor exists
 	if !executors.IsValidExecutor(req.Executor) {
-		return "", fmt.Errorf("unknown executor: %s", req.Executor)
+		return "", fmt.Errorf("%w: %s", toyreduce.ErrUnknownExecutor, req.Executor)
 	}
 
 	// Create job
@@ -241,7 +241,7 @@ func (m *Master) initializeJob(jobID string, job *protocol.Job) error {
 		}
 	}()
 
-	var mapTasks []*protocol.MapTask
+	var mapTasks = make([]*protocol.MapTask, 0, len(chunks))
 
 	for chunk := range chunks {
 		task := &protocol.MapTask{
@@ -283,7 +283,7 @@ func (m *Master) RegisterWorker(workerID, version string, executors []string, da
 	}
 
 	if !compatible {
-		return fmt.Errorf("incompatible version: %s", protocol.GetCompatibilityError(version, protocol.ToyReduceVersion))
+		return fmt.Errorf("%w: %s", toyreduce.ErrIncompatibleVersion, protocol.GetCompatibilityError(version, protocol.ToyReduceVersion))
 	}
 
 	m.mu.Lock()
@@ -378,7 +378,7 @@ func (m *Master) CancelJob(jobID string) error {
 
 	job, exists := m.jobs[jobID]
 	if !exists {
-		return fmt.Errorf("job not found: %s", jobID)
+		return fmt.Errorf("%w: %s", toyreduce.ErrJobNotFound, jobID)
 	}
 
 	if job.Status == protocol.JobStatusCompleted || job.Status == protocol.JobStatusFailed {
@@ -386,7 +386,7 @@ func (m *Master) CancelJob(jobID string) error {
 	}
 
 	if job.Status == protocol.JobStatusCancelled {
-		return errors.New("job already cancelled")
+		return toyreduce.ErrJobAlreadyCancelled
 	}
 
 	// Mark as cancelled

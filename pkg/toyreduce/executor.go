@@ -22,6 +22,8 @@ how does return work?
 */
 
 /*
+Chunk → Map → Shuffle → Reduce → Collect
+
 1. Chunk file
 2. Map: each chunk → one worker → emits (key, value) pairs.
 3. Shuffle: merge all outputs, group by key.

@@ -249,6 +249,7 @@ func TestShuffle(t *testing.T) {
 func TestMapPhase(t *testing.T) {
 	t.Parallel()
 	t.Run("simple map", func(t *testing.T) {
+		t.Parallel()
 		// Worker that emits key-value pairs and has a passthrough reduce
 		var myWorker Worker = WorkerFunc{
 			MapFunc: func(chunk []string, emit Emitter) error {

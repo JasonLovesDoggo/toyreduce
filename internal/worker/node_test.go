@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"testing"
 
 	"pkg.jsn.cam/toyreduce/pkg/executors"
@@ -212,11 +213,11 @@ type mockWorker struct {
 	name string
 }
 
-func (w *mockWorker) Map(chunk []string, emit toyreduce.Emitter) error {
+func (w *mockWorker) Map(ctx context.Context, chunk []string, emit toyreduce.Emitter) error {
 	return nil
 }
 
-func (w *mockWorker) Reduce(key string, values []string, emit toyreduce.Emitter) error {
+func (w *mockWorker) Reduce(ctx context.Context, key string, values []string, emit toyreduce.Emitter) error {
 	return nil
 }
 

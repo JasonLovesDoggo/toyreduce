@@ -1,0 +1,36 @@
+version: 2
+run:
+  tests: true
+
+linters:
+  default: all
+  disable:
+    - godot          # don't force periods in comments
+    - wrapcheck      # allow unwrapped errors
+    - tagliatelle    # allow flexible tag casing
+    - gochecknoglobals  # allow global vars (removed per request)
+    - testpackage       # allow tests in same package
+    - revive       # too verbose for now
+    - mnd
+    - exhaustruct
+    - depguard
+    - varnamelen
+    - nlreturn
+    - ireturn
+    - forbidigo
+    - noinlineerr
+    - cyclop
+    - nilerr
+    - gocritic
+    - errcheck
+    - interfacebloat
+    - lll
+    - funcorder
+
+issues:
+  max-same-issues: 3
+
+
+linters-settings:
+  cyclop:
+    max-complexity: 15

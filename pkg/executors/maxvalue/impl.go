@@ -1,6 +1,7 @@
 package maxvalue
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -12,8 +13,13 @@ import (
 type MaxValueWorker struct{}
 
 // Map extracts key-value pairs and emits them
-func (w MaxValueWorker) Map(chunk []string, emit toyreduce.Emitter) error {
+func (w MaxValueWorker) Map(ctx context.Context, chunk []string, emit toyreduce.Emitter) error {
 	for _, line := range chunk {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) == 2 {
 			emit(toyreduce.KeyValue{Key: parts[0], Value: parts[1]})
@@ -24,7 +30,12 @@ func (w MaxValueWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 }
 
 // Combine finds the local maximum for each key (runs after Map)
-func (w MaxValueWorker) Combine(key string, values []string, emit toyreduce.Emitter) error {
+func (w MaxValueWorker) Combine(ctx context.Context, key string, values []string, emit toyreduce.Emitter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 	if len(values) == 0 {
 		return nil
 	}
@@ -42,9 +53,9 @@ func (w MaxValueWorker) Combine(key string, values []string, emit toyreduce.Emit
 }
 
 // Reduce finds the global maximum for each key across all combined results
-func (w MaxValueWorker) Reduce(key string, values []string, emit toyreduce.Emitter) error {
+func (w MaxValueWorker) Reduce(ctx context.Context, key string, values []string, emit toyreduce.Emitter) error {
 	// Same logic as Combine - finding maximum is associative
-	return w.Combine(key, values, emit)
+	return w.Combine(ctx, key, values, emit)
 }
 
 func (w MaxValueWorker) Description() string {

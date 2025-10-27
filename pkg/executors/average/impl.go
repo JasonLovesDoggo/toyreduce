@@ -1,6 +1,7 @@
 package average
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -14,8 +15,13 @@ import (
 type AverageWorker struct{}
 
 // Map extracts key-value pairs and emits (key, value)
-func (w AverageWorker) Map(chunk []string, emit toyreduce.Emitter) error {
+func (w AverageWorker) Map(ctx context.Context, chunk []string, emit toyreduce.Emitter) error {
 	for _, line := range chunk {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) == 2 {
 			emit(toyreduce.KeyValue{Key: parts[0], Value: parts[1]})
@@ -27,7 +33,7 @@ func (w AverageWorker) Map(chunk []string, emit toyreduce.Emitter) error {
 
 // Combine aggregates values locally by computing sum and count.
 // Emits (key, "sum:count") to allow downstream reducers to compute final average.
-func (w AverageWorker) Combine(key string, values []string, emit toyreduce.Emitter) error {
+func (w AverageWorker) Combine(ctx context.Context, key string, values []string, emit toyreduce.Emitter) error {
 	var (
 		sum   float64
 		count int
@@ -62,7 +68,12 @@ func (w AverageWorker) Combine(key string, values []string, emit toyreduce.Emitt
 }
 
 // Reduce computes the final average from aggregated sum:count pairs
-func (w AverageWorker) Reduce(key string, values []string, emit toyreduce.Emitter) error {
+func (w AverageWorker) Reduce(ctx context.Context, key string, values []string, emit toyreduce.Emitter) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
 	var (
 		totalSum   float64
 		totalCount int

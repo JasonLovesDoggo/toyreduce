@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -73,7 +74,7 @@ func NewNode(cfg Config) (*Node, error) {
 }
 
 // Start starts the worker main loop
-func (n *Node) Start() error {
+func (n *Node) Start(ctx context.Context) error {
 	log.Printf("[WORKER:%s] Starting worker (version: %s)", n.id, protocol.ToyReduceVersion)
 
 	// Start data server
@@ -86,7 +87,7 @@ func (n *Node) Start() error {
 	log.Printf("[WORKER:%s] Available executors: %v", n.id, executors)
 
 	// Register with master (include data endpoint)
-	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executors, dataEndpoint)
+	regResp, err := n.client.Register(ctx, n.id, protocol.ToyReduceVersion, executors, dataEndpoint)
 	if err != nil {
 		log.Printf("[WORKER:%s] Registration failed: %v", n.id, err)
 		return fmt.Errorf("registration failed: %w", err)
@@ -95,88 +96,96 @@ func (n *Node) Start() error {
 	log.Printf("[WORKER:%s] Registration successful (store: %s)", n.id, regResp.StoreURL)
 
 	// Start heartbeat goroutine
-	go n.heartbeatLoop()
+	go n.heartbeatLoop(ctx)
 
 	// Main task processing loop
-	n.taskLoop()
+	n.taskLoop(ctx)
 
 	return nil
 }
 
-// taskLoop polls for and processes tasks
-func (n *Node) taskLoop() {
+// taskLoop polls for tasks from master and processes them.
+// The function runs indefinitely until context cancellation is triggered.
+// The defer ticker.Stop() executes when the function exits (on context cancellation),
+// ensuring the ticker is properly cleaned up.
+func (n *Node) taskLoop(ctx context.Context) {
 	pollInterval := n.config.PollInterval
 	if pollInterval == 0 {
 		pollInterval = 500 * time.Millisecond
 	}
 
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
 	for {
-		// Request next task
-		task, err := n.client.GetNextTask(n.id)
-		if err != nil {
-			log.Printf("[WORKER:%s] Error getting next task: %v", n.id, err)
-			time.Sleep(pollInterval)
-
-			continue
-		}
-
-		// Process task based on type
-		switch task.Type {
-		case protocol.TaskTypeNone:
-			// No tasks available, wait and retry
-			time.Sleep(pollInterval)
-
-		case protocol.TaskTypeMap:
-			// Get worker implementation from task's executor field
-			worker := executors.GetExecutor(task.MapTask.Executor)
-			if worker == nil {
-				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.MapTask.Executor)
-				time.Sleep(pollInterval)
-
+		select {
+		case <-ctx.Done():
+			log.Printf("[WORKER:%s] Task loop shutting down", n.id)
+			return
+		case <-ticker.C:
+			// Request next task
+			task, err := n.client.GetNextTask(ctx, n.id)
+			if err != nil {
+				log.Printf("[WORKER:%s] Error getting next task: %v", n.id, err)
 				continue
 			}
 
-			// Create processor for this executor (supports different executors per task)
-			if n.processor == nil || n.processor.worker != worker {
-				n.processor = NewProcessor(worker, n.client, n.storage)
-			}
-
-			if err := n.processor.ProcessMapTask(task.MapTask, n.id); err != nil {
-				log.Printf("[WORKER:%s] Map task failed: %v", n.id, err)
-				// Notify master of failure
-				n.client.CompleteTask(task.MapTask.ID, n.id, task.MapTask.Version, false, err.Error())
-			}
-
-		case protocol.TaskTypeReduce:
-			// Get worker implementation from task's executor field
-			worker := executors.GetExecutor(task.ReduceTask.Executor)
-			if worker == nil {
-				log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.ReduceTask.Executor)
-				time.Sleep(pollInterval)
-
+			// Process task based on type
+			switch task.Type {
+			case protocol.TaskTypeNone:
+				// No tasks available, wait and retry
 				continue
-			}
 
-			// Create processor for this executor (supports different executors per task)
-			if n.processor == nil || n.processor.worker != worker {
-				n.processor = NewProcessor(worker, n.client, n.storage)
-			}
+			case protocol.TaskTypeMap:
+				// Get worker implementation from task's executor field
+				worker := executors.GetExecutor(task.MapTask.Executor)
+				if worker == nil {
+					log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.MapTask.Executor)
+					continue
+				}
 
-			if err := n.processor.ProcessReduceTask(task.ReduceTask, n.id); err != nil {
-				log.Printf("[WORKER:%s] Reduce task failed: %v", n.id, err)
-				// Notify master of failure
-				n.client.CompleteTask(task.ReduceTask.ID, n.id, task.ReduceTask.Version, false, err.Error())
-			}
+				// Create processor for this executor (supports different executors per task)
+				if n.processor == nil || n.processor.worker != worker {
+					n.processor = NewProcessor(worker, n.client, n.storage)
+				}
 
-		default:
-			log.Printf("[WORKER:%s] Unknown task type: %s", n.id, task.Type)
-			time.Sleep(pollInterval)
+				if err := n.processor.ProcessMapTask(ctx, task.MapTask, n.id); err != nil {
+					log.Printf("[WORKER:%s] Map task failed: %v", n.id, err)
+					// Notify master of failure
+					n.client.CompleteTask(ctx, task.MapTask.ID, n.id, task.MapTask.Version, false, err.Error())
+				}
+
+			case protocol.TaskTypeReduce:
+				// Get worker implementation from task's executor field
+				worker := executors.GetExecutor(task.ReduceTask.Executor)
+				if worker == nil {
+					log.Printf("[WORKER:%s] Unknown executor: %s", n.id, task.ReduceTask.Executor)
+					continue
+				}
+
+				// Create processor for this executor (supports different executors per task)
+				if n.processor == nil || n.processor.worker != worker {
+					n.processor = NewProcessor(worker, n.client, n.storage)
+				}
+
+				if err := n.processor.ProcessReduceTask(ctx, task.ReduceTask, n.id); err != nil {
+					log.Printf("[WORKER:%s] Reduce task failed: %v", n.id, err)
+					// Notify master of failure
+					n.client.CompleteTask(ctx, task.ReduceTask.ID, n.id, task.ReduceTask.Version, false, err.Error())
+				}
+
+			default:
+				log.Printf("[WORKER:%s] Unknown task type: %s", n.id, task.Type)
+			}
 		}
 	}
 }
 
-// heartbeatLoop sends periodic heartbeats to master
-func (n *Node) heartbeatLoop() {
+// heartbeatLoop sends periodic heartbeats to the master.
+// The function runs indefinitely until context cancellation is triggered.
+// The defer ticker.Stop() executes when the function exits (on context cancellation),
+// ensuring the ticker is properly cleaned up.
+func (n *Node) heartbeatLoop(ctx context.Context) {
 	interval := n.config.HeartbeatInterval
 	if interval == 0 {
 		interval = 10 * time.Second
@@ -185,33 +194,39 @@ func (n *Node) heartbeatLoop() {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		ok, err := n.client.SendHeartbeat(n.id)
-		if err != nil {
-			log.Printf("[WORKER:%s] Heartbeat request failed: %v", n.id, err)
-			continue
-		}
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("[WORKER:%s] Heartbeat loop shutting down", n.id)
+			return
+		case <-ticker.C:
+			ok, err := n.client.SendHeartbeat(ctx, n.id)
+			if err != nil {
+				log.Printf("[WORKER:%s] Heartbeat request failed: %v", n.id, err)
+				continue
+			}
 
-		// If heartbeat was rejected (OK=false), master doesn't know about us
-		// This happens when master restarts and loses worker registrations
-		if !ok {
-			log.Printf("[WORKER:%s] Heartbeat rejected - master doesn't recognize worker, re-registering", n.id)
+			// If heartbeat was rejected (OK=false), master doesn't know about us
+			// This happens when master restarts and loses worker registrations
+			if !ok {
+				log.Printf("[WORKER:%s] Heartbeat rejected - master doesn't recognize worker, re-registering", n.id)
 
-			if err := n.reregister(); err != nil {
-				log.Printf("[WORKER:%s] Re-registration failed: %v", n.id, err)
-			} else {
-				log.Printf("[WORKER:%s] Re-registration successful", n.id)
+				if err := n.reregister(ctx); err != nil {
+					log.Printf("[WORKER:%s] Re-registration failed: %v", n.id, err)
+				} else {
+					log.Printf("[WORKER:%s] Re-registration successful", n.id)
+				}
 			}
 		}
 	}
 }
 
 // reregister attempts to re-register with the master
-func (n *Node) reregister() error {
+func (n *Node) reregister(ctx context.Context) error {
 	executorOptions := executors.ListExecutors()
 	dataEndpoint := n.server.GetEndpoint()
 
-	regResp, err := n.client.Register(n.id, protocol.ToyReduceVersion, executorOptions, dataEndpoint)
+	regResp, err := n.client.Register(ctx, n.id, protocol.ToyReduceVersion, executorOptions, dataEndpoint)
 	if err != nil {
 		return fmt.Errorf("registration failed: %w", err)
 	}

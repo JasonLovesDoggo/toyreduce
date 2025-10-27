@@ -1,13 +1,15 @@
 package toyreduce
 
+import "context"
+
 type KeyValue struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
 type Worker interface {
-	Map(chunk []string, emit Emitter) error
-	Reduce(key string, values []string, emit Emitter) error
+	Map(ctx context.Context, chunk []string, emit Emitter) error
+	Reduce(ctx context.Context, key string, values []string, emit Emitter) error
 	Description() string
 }
 
@@ -24,7 +26,7 @@ type CombinableWorker interface {
 	Worker
 	// Combine is called after Map to pre-aggregate values locally.
 	// If not implemented, the worker's Reduce() function is used by default.
-	Combine(key string, values []string, emit Emitter) error
+	Combine(ctx context.Context, key string, values []string, emit Emitter) error
 }
 
 // DisableCombinerCheck is an optional interface to opt-out of combining.

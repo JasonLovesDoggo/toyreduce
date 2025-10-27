@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -33,13 +34,13 @@ func TestBasicWordCount(t *testing.T) {
 	chunks := make(chan []string, 10)
 
 	go func() {
-		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
+		if err := toyreduce.Chunk(context.Background(), tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)
 		}
 	}()
 
 	// Map phase
-	mapped, err := toyreduce.MapPhase(chunks, worker)
+	mapped, err := toyreduce.MapPhase(context.Background(), chunks, worker)
 	if err != nil {
 		t.Fatalf("Map phase failed: %v", err)
 	}
@@ -48,7 +49,10 @@ func TestBasicWordCount(t *testing.T) {
 	grouped := toyreduce.Shuffle(mapped)
 
 	// Reduce phase
-	results := toyreduce.ReducePhase(grouped, worker)
+	results, err := toyreduce.ReducePhase(context.Background(), grouped, worker)
+	if err != nil {
+		t.Fatalf("Reduce phase failed: %v", err)
+	}
 
 	// Verify results
 	if len(results) == 0 {
@@ -102,18 +106,21 @@ func TestEmptyFile(t *testing.T) {
 	chunks := make(chan []string, 1)
 
 	go func() {
-		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
+		if err := toyreduce.Chunk(context.Background(), tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)
 		}
 	}()
 
-	mapped, err := toyreduce.MapPhase(chunks, worker)
+	mapped, err := toyreduce.MapPhase(context.Background(), chunks, worker)
 	if err != nil {
 		t.Fatalf("Map phase failed: %v", err)
 	}
 
 	grouped := toyreduce.Shuffle(mapped)
-	results := toyreduce.ReducePhase(grouped, worker)
+	results, err := toyreduce.ReducePhase(context.Background(), grouped, worker)
+	if err != nil {
+		t.Fatalf("Reduce phase failed: %v", err)
+	}
 
 	if len(results) != 0 {
 		t.Errorf("Expected 0 results for empty file, got %d", len(results))
@@ -142,18 +149,21 @@ func TestSingleLine(t *testing.T) {
 	chunks := make(chan []string, 1)
 
 	go func() {
-		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
+		if err := toyreduce.Chunk(context.Background(), tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)
 		}
 	}()
 
-	mapped, err := toyreduce.MapPhase(chunks, worker)
+	mapped, err := toyreduce.MapPhase(context.Background(), chunks, worker)
 	if err != nil {
 		t.Fatalf("Map phase failed: %v", err)
 	}
 
 	grouped := toyreduce.Shuffle(mapped)
-	results := toyreduce.ReducePhase(grouped, worker)
+	results, err := toyreduce.ReducePhase(context.Background(), grouped, worker)
+	if err != nil {
+		t.Fatalf("Reduce phase failed: %v", err)
+	}
 
 	if len(results) != 1 {
 		t.Errorf("Expected 1 result, got %d", len(results))
@@ -191,18 +201,21 @@ func TestLargeInput(t *testing.T) {
 	chunks := make(chan []string, 100)
 
 	go func() {
-		if err := toyreduce.Chunk(tmpfile.Name(), 1, chunks); err != nil {
+		if err := toyreduce.Chunk(context.Background(), tmpfile.Name(), 1, chunks); err != nil {
 			t.Errorf("Chunk failed: %v", err)
 		}
 	}()
 
-	mapped, err := toyreduce.MapPhase(chunks, worker)
+	mapped, err := toyreduce.MapPhase(context.Background(), chunks, worker)
 	if err != nil {
 		t.Fatalf("Map phase failed: %v", err)
 	}
 
 	grouped := toyreduce.Shuffle(mapped)
-	results := toyreduce.ReducePhase(grouped, worker)
+	results, err := toyreduce.ReducePhase(context.Background(), grouped, worker)
+	if err != nil {
+		t.Fatalf("Reduce phase failed: %v", err)
+	}
 
 	// Build result map
 	counts := make(map[string]string)

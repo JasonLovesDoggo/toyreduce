@@ -2,6 +2,7 @@ package worker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,13 +25,16 @@ func NewClient(masterURL string) *Client {
 	return &Client{
 		masterURL: masterURL,
 		http: &http.Client{
-			Timeout: 20 * time.Second, // 20s chosen to accommodate potentially large data transfers and network variability; based on expected operation duration in typical deployments.
+			// Add default timeout as safety net to prevent indefinite hangs.
+			// Per-request timeouts can be enforced via context deadlines which will override this.
+			// This ensures that requests don't hang if no context deadline is set.
+			Timeout: 30 * time.Second,
 		},
 	}
 }
 
 // Register registers this worker with the master
-func (c *Client) Register(workerID string, version string, executors []string, dataEndpoint string) (*protocol.WorkerRegistrationResponse, error) {
+func (c *Client) Register(ctx context.Context, workerID string, version string, executors []string, dataEndpoint string) (*protocol.WorkerRegistrationResponse, error) {
 	req := protocol.WorkerRegistrationRequest{
 		WorkerID:     workerID,
 		Version:      version,
@@ -43,11 +47,13 @@ func (c *Client) Register(workerID string, version string, executors []string, d
 		return nil, err
 	}
 
-	resp, err := c.http.Post(
-		c.masterURL+"/api/workers/register",
-		"application/json",
-		bytes.NewBuffer(body),
-	)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.masterURL+"/api/workers/register", bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}
@@ -70,10 +76,15 @@ func (c *Client) Register(workerID string, version string, executors []string, d
 }
 
 // GetNextTask requests the next task from master
-func (c *Client) GetNextTask(workerID string) (*protocol.Task, error) {
+func (c *Client) GetNextTask(ctx context.Context, workerID string) (*protocol.Task, error) {
 	url := fmt.Sprintf("%s/api/tasks/next?workerID=%s", c.masterURL, workerID)
 
-	resp, err := c.http.Get(url)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +103,7 @@ func (c *Client) GetNextTask(workerID string) (*protocol.Task, error) {
 }
 
 // CompleteTask notifies master that a task is complete
-func (c *Client) CompleteTask(taskID, workerID, version string, success bool, errorMsg string) error {
+func (c *Client) CompleteTask(ctx context.Context, taskID, workerID, version string, success bool, errorMsg string) error {
 	req := protocol.TaskCompletionRequest{
 		Success: success,
 		Error:   errorMsg,
@@ -106,7 +117,13 @@ func (c *Client) CompleteTask(taskID, workerID, version string, success bool, er
 
 	url := fmt.Sprintf("%s/api/tasks/%s/complete?workerID=%s", c.masterURL, taskID, workerID)
 
-	resp, err := c.http.Post(url, "application/json", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return err
 	}
@@ -121,7 +138,7 @@ func (c *Client) CompleteTask(taskID, workerID, version string, success bool, er
 }
 
 // SendHeartbeat sends a heartbeat to master and returns whether it was accepted
-func (c *Client) SendHeartbeat(workerID string) (bool, error) {
+func (c *Client) SendHeartbeat(ctx context.Context, workerID string) (bool, error) {
 	req := protocol.HeartbeatRequest{
 		Timestamp: time.Now(),
 	}
@@ -133,7 +150,13 @@ func (c *Client) SendHeartbeat(workerID string) (bool, error) {
 
 	url := fmt.Sprintf("%s/api/workers/%s/heartbeat", c.masterURL, workerID)
 
-	resp, err := c.http.Post(url, "application/json", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return false, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return false, err
 	}
@@ -152,7 +175,7 @@ func (c *Client) SendHeartbeat(workerID string) (bool, error) {
 }
 
 // StoreMapOutput sends map output to store
-func (c *Client) StoreMapOutput(taskID string, partition int, data []toyreduce.KeyValue) error {
+func (c *Client) StoreMapOutput(ctx context.Context, taskID string, partition int, data []toyreduce.KeyValue) error {
 	req := protocol.IntermediateData{
 		TaskID:    taskID,
 		Partition: partition,
@@ -166,7 +189,13 @@ func (c *Client) StoreMapOutput(taskID string, partition int, data []toyreduce.K
 
 	url := fmt.Sprintf("%s/intermediate/map/%s/%d", c.storeURL, taskID, partition)
 
-	resp, err := c.http.Post(url, "application/json", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return err
 	}
@@ -180,10 +209,15 @@ func (c *Client) StoreMapOutput(taskID string, partition int, data []toyreduce.K
 }
 
 // GetReduceInput retrieves intermediate data for a partition from store
-func (c *Client) GetReduceInput(partition int) ([]toyreduce.KeyValue, error) {
+func (c *Client) GetReduceInput(ctx context.Context, partition int) ([]toyreduce.KeyValue, error) {
 	url := fmt.Sprintf("%s/intermediate/reduce/%d", c.storeURL, partition)
 
-	resp, err := c.http.Get(url)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +236,7 @@ func (c *Client) GetReduceInput(partition int) ([]toyreduce.KeyValue, error) {
 }
 
 // StoreReduceOutput sends reduce output to store
-func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyValue) error {
+func (c *Client) StoreReduceOutput(ctx context.Context, taskID, jobID string, data []toyreduce.KeyValue) error {
 	req := protocol.IntermediateData{
 		TaskID: taskID,
 		JobID:  jobID,
@@ -216,7 +250,13 @@ func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyVal
 
 	url := fmt.Sprintf("%s/results/%s", c.storeURL, taskID)
 
-	resp, err := c.http.Post(url, "application/json", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return err
 	}
@@ -230,10 +270,15 @@ func (c *Client) StoreReduceOutput(taskID, jobID string, data []toyreduce.KeyVal
 }
 
 // FetchPartitionFromWorker fetches a specific partition from a worker's data endpoint
-func (c *Client) FetchPartitionFromWorker(workerEndpoint, jobID string, partition int) ([]toyreduce.KeyValue, error) {
+func (c *Client) FetchPartitionFromWorker(ctx context.Context, workerEndpoint, jobID string, partition int) ([]toyreduce.KeyValue, error) {
 	url := fmt.Sprintf("%s/data/%s/partition/%d", workerEndpoint, jobID, partition)
 
-	resp, err := c.http.Get(url)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("fetch from worker %s: %w", workerEndpoint, err)
+	}
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("fetch from worker %s: %w", workerEndpoint, err)
 	}
@@ -252,10 +297,16 @@ func (c *Client) FetchPartitionFromWorker(workerEndpoint, jobID string, partitio
 }
 
 // RequestCleanupFromWorker requests a worker to cleanup job data
-func (c *Client) RequestCleanupFromWorker(workerEndpoint, jobID string) error {
+func (c *Client) RequestCleanupFromWorker(ctx context.Context, workerEndpoint, jobID string) error {
 	url := fmt.Sprintf("%s/cleanup/%s", workerEndpoint, jobID)
 
-	resp, err := c.http.Post(url, "application/json", nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	if err != nil {
+		return fmt.Errorf("cleanup request to worker %s: %w", workerEndpoint, err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("cleanup request to worker %s: %w", workerEndpoint, err)
 	}
